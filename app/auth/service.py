@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.security import hash_password
+from app.auth.security import hash_password, verify_password
 from app.models.user import User
 
 
@@ -28,4 +28,18 @@ def register_user(db: Session, email: str, password: str) -> User:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
     db.refresh(user)
+    return user
+
+
+def authenticate_user(db: Session, email: str, password: str) -> User:
+    normalized_email = _normalize_email(email)
+    unauthorized = HTTPException(
+        status.HTTP_401_UNAUTHORIZED, "Incorrect email or password"
+    )
+
+    user = db.execute(
+        select(User).where(User.email == normalized_email)
+    ).scalar_one_or_none()
+    if user is None or not verify_password(password, user.password_hash):
+        raise unauthorized
     return user
