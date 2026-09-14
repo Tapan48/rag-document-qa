@@ -1,8 +1,9 @@
 # RAG Document Q&A Backend
 
-Foundation for a RAG (Retrieval-Augmented Generation) document Q&A backend.
-This stage sets up the project skeleton only — no auth, tables, ingestion, or
-Q&A logic yet.
+Backend for a RAG (Retrieval-Augmented Generation) document Q&A app.
+Part 1 set up the project skeleton; Part 2 adds user registration, login,
+JWT authentication, and the `users`/`documents`/`chunks` tables. Document
+ingestion, retrieval, and Q&A are not implemented yet — see `plan/`.
 
 ## Stack
 
@@ -35,7 +36,32 @@ In a separate terminal, once `db` is healthy:
 docker compose run --rm api alembic upgrade head
 ```
 
-This enables the `pgvector` extension in Postgres.
+This enables the `pgvector` extension and creates the `users`, `documents`,
+and `chunks` tables.
+
+## Auth
+
+```bash
+curl -X POST http://localhost:8010/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"correct-horse-battery"}'
+
+curl -X POST http://localhost:8010/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"correct-horse-battery"}'
+# -> {"access_token": "...", "token_type": "bearer"}
+
+curl http://localhost:8010/auth/me -H "Authorization: Bearer <access_token>"
+```
+
+## Run tests
+
+```bash
+docker compose exec api pytest -v
+```
+
+Tests run against the real Postgres `db` service; each test runs inside a
+transaction that's rolled back afterward, so nothing persists.
 
 ## Verify
 
