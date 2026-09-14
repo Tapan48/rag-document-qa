@@ -1,0 +1,31 @@
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.auth.security import hash_password
+from app.models.user import User
+
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def register_user(db: Session, email: str, password: str) -> User:
+    normalized_email = _normalize_email(email)
+
+    existing = db.execute(
+        select(User).where(User.email == normalized_email)
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
+
+    user = User(email=normalized_email, password_hash=hash_password(password))
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
+    db.refresh(user)
+    return user
