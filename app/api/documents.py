@@ -10,6 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.documents.queries import get_owned_document
 from app.documents.schemas import DocumentList, DocumentPublic
+from app.ingestion.tasks import process_document
 from app.models.document import Document, DocumentStatus
 from app.models.user import User
 
@@ -58,6 +59,14 @@ async def upload_document(
     db.add(document)
     db.commit()
     db.refresh(document)
+
+    try:
+        process_document.delay(str(document.id))
+    except Exception:
+        document.status = DocumentStatus.FAILED
+        document.error_message = "Could not queue document for processing"
+        db.commit()
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Processing queue unavailable")
 
     return document
 
