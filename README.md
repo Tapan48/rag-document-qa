@@ -2,9 +2,10 @@
 
 Backend for a RAG (Retrieval-Augmented Generation) document Q&A app.
 Part 1 set up the project skeleton; Part 2 added user registration, login,
-JWT authentication, and the `users`/`documents`/`chunks` tables; Part 3 adds
+JWT authentication, and the `users`/`documents`/`chunks` tables; Part 3 added
 document upload, text extraction, chunking, and embedding generation via a
-Celery background pipeline. Retrieval and Q&A are not implemented yet —
+Celery background pipeline; Part 4 adds owner-scoped vector retrieval and
+grounded, cited question answering. Streaming is not implemented yet —
 see `plan/`.
 
 ## Stack
@@ -85,6 +86,39 @@ A background Celery task extracts text, splits it into ~500-token chunks
 in `chunks.embedding`. Transient embedding failures (timeouts, rate limits)
 retry up to 3 times with exponential backoff before the document is marked
 `failed`.
+
+## Questions
+
+```bash
+curl -X POST http://localhost:8010/questions \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is this document about?"}'
+# -> {"answer": "...", "citations": [...], "insufficient_evidence": false}
+
+# Restrict to specific documents (omit document_ids to search all your ready documents)
+curl -X POST http://localhost:8010/questions \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"...", "document_ids":["<document_id>"]}'
+```
+
+The question is embedded with the same model used for ingestion, then the 5
+nearest chunks (cosine distance, exact search — no vector index yet) owned by
+the caller are retrieved and sent to `gpt-5.6-luna` via the Responses API with
+structured output. The model may only answer from those passages, must cite
+which ones it used, and any text inside a document is treated as untrusted
+data, not instructions. Citations are resolved server-side against the
+actual retrieved chunks — the model's own claims about filenames or page
+numbers are never trusted directly. An unrelated question, or one with no
+ready documents at all, returns `insufficient_evidence: true` with no
+citations instead of a fabricated answer.
+
+`document_ids` must reference documents you own and that are `ready`
+(`404`/`409` otherwise); passing an explicit empty list is rejected (`422`) —
+omit the field entirely to search everything. Provider failures map to
+`503` (unavailable), `504` (timeout), or `502` (malformed/refused output) —
+never a raw provider error.
 
 ## Run tests
 
