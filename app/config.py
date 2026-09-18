@@ -20,5 +20,10 @@ class Settings(BaseSettings):
     chunk_size_tokens: int = 500
     chunk_overlap_tokens: int = 100
 
+    chat_model: str = "gpt-5.6-luna"
+    reasoning_effort: str = "none"
+    retrieval_top_k: int = 5
+    max_output_tokens: int = 1000
+
 
 settings = Settings()
