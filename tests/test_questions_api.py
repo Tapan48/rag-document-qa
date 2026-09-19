@@ -3,6 +3,7 @@ import uuid
 import pytest
 
 from app.api import questions as questions_module
+from app.retrieval import pipeline as pipeline_module
 from app.ingestion.embeddings import EmbeddingError, EmbeddingTransientError
 from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
@@ -47,7 +48,7 @@ def _create_ready_document_with_chunk(db_session, owner_email: str, text: str = 
 
 
 def _stub_embed(monkeypatch, vector=None):
-    monkeypatch.setattr(questions_module, "embed_texts", lambda texts: [vector or _one_hot(0)])
+    monkeypatch.setattr(pipeline_module, "embed_texts", lambda texts: [vector or _one_hot(0)])
 
 
 def _stub_generate(monkeypatch, result=None, exc=None):
@@ -156,7 +157,7 @@ def test_embedding_transient_error_returns_503(client, monkeypatch):
     def raise_transient(texts):
         raise EmbeddingTransientError("timeout")
 
-    monkeypatch.setattr(questions_module, "embed_texts", raise_transient)
+    monkeypatch.setattr(pipeline_module, "embed_texts", raise_transient)
 
     response = client.post("/questions", headers=headers, json={"question": "q"})
 
@@ -169,7 +170,7 @@ def test_embedding_error_returns_502(client, monkeypatch):
     def raise_permanent(texts):
         raise EmbeddingError("bad")
 
-    monkeypatch.setattr(questions_module, "embed_texts", raise_permanent)
+    monkeypatch.setattr(pipeline_module, "embed_texts", raise_permanent)
 
     response = client.post("/questions", headers=headers, json={"question": "q"})
 
