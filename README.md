@@ -1,17 +1,20 @@
-# RAG Document Q&A Backend
+# RAG Document Q&A
 
-Backend for a RAG (Retrieval-Augmented Generation) document Q&A app.
+A full-stack RAG (Retrieval-Augmented Generation) document Q&A app.
 Part 1 set up the project skeleton; Part 2 added user registration, login,
 JWT authentication, and the `users`/`documents`/`chunks` tables; Part 3 added
 document upload, text extraction, chunking, and embedding generation via a
 Celery background pipeline; Part 4 added owner-scoped vector retrieval and
-grounded, cited question answering; Part 5 adds a streaming version of
-question answering over Server-Sent Events. See `plan/`.
+grounded, cited question answering; Part 5 added a streaming version of
+question answering over Server-Sent Events; Part 6 added a React frontend
+(document sidebar, streamed Q&A, citation panel). See `plan/`.
 
 ## Stack
 
-Python, FastAPI, PostgreSQL + pgvector, SQLAlchemy, Alembic, Celery, Redis,
-Docker Compose.
+**Backend:** Python, FastAPI, PostgreSQL + pgvector, SQLAlchemy, Alembic,
+Celery, Redis.
+**Frontend:** React, TypeScript, Vite, Tailwind CSS, shadcn/ui.
+**Infra:** Docker Compose.
 
 ## Setup
 
@@ -25,11 +28,12 @@ cp .env.example .env
 docker compose up --build
 ```
 
-This starts four services: `db` (Postgres with pgvector, host port 5433),
-`redis` (host port 6380), `api` (FastAPI, host port 8010), and `worker`
-(Celery worker). Host ports are non-default to avoid clashing with other
-local services; containers still talk to each other over the internal
-Docker network using the default ports.
+This starts five services: `db` (Postgres with pgvector, host port 5433),
+`redis` (host port 6380), `api` (FastAPI, host port 8010), `worker`
+(Celery worker), and `frontend` (Vite dev server, host port 5173). Host
+ports are non-default to avoid clashing with other local services;
+containers still talk to each other over the internal Docker network using
+the default ports.
 
 ## Run migrations
 
@@ -163,6 +167,42 @@ so this endpoint isn't consumable via plain `new EventSource(url)`. Use
 `@microsoft/fetch-event-source`) to read the SSE body from a `POST`
 response instead.
 
+## Frontend
+
+Open `http://localhost:5173` once `docker compose up --build` is running.
+Register, log in, upload a PDF/DOCX/TXT file, wait for it to reach `ready`,
+then ask a question — the answer streams in and citation buttons open a
+panel with the source passage.
+
+The dev server proxies any request to `/api/...` to the FastAPI backend and
+strips the prefix, so the browser only ever talks to `localhost:5173` (no
+CORS, no exposed backend port, no API keys in the browser). In Compose,
+that proxy target is `http://api:8000` (the `VITE_API_PROXY_TARGET` env var
+on the `frontend` service); running the frontend standalone (outside
+Compose) instead targets `http://localhost:8010` by default.
+
+Run the frontend outside Docker:
+
+```bash
+cd frontend
+npm install
+npm run dev          # http://localhost:5173, proxies to localhost:8010
+```
+
+Frontend checks:
+
+```bash
+cd frontend
+npm run lint         # oxlint
+npm run typecheck    # tsc -b --noEmit
+npm test             # Vitest + React Testing Library
+npm run build         # typecheck + production Vite build
+```
+
+JWTs are kept in `sessionStorage` (a local-demo choice, cleared on logout
+or tab close); the frontend never has access to `OPENAI_API_KEY` or the
+database — those stay backend-only.
+
 ## Run tests
 
 ```bash
@@ -175,6 +215,11 @@ transaction that's rolled back afterward, so nothing persists.
 ## Verify
 
 - Health check: `curl http://localhost:8010/health` should return `{"status":"ok"}`.
+- Frontend serving and proxying to the backend:
+  ```bash
+  curl -o /dev/null -w "%{http_code}\n" http://localhost:5173/       # -> 200
+  curl http://localhost:5173/api/health                              # -> {"status":"ok"}
+  ```
 - pgvector enabled:
   ```bash
   docker compose exec db psql -U rag -d rag -c "\dx vector"

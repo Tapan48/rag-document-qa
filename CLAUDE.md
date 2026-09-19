@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Parts 1–5 (Foundation, Authentication and Ownership, Document Ingestion, Retrieval and Answers, Streaming and Failures) are complete — see `plan/part1_foundation.md` through `plan/part5_streams+failure-handling.md` for what was built and how it was verified. The full roadmap (Part 6, portfolio docs) is in `plan/PLAN_main.md`.
+Parts 1–6 (Foundation, Authentication and Ownership, Document Ingestion, Retrieval and Answers, Streaming and Failures, Frontend) are complete — see `plan/part1_foundation.md` through `plan/part6_frontend.md` for what was built and how it was verified. The full roadmap (Part 7, portfolio docs) is in `plan/PLAN_main.md`.
 
 ## Commands
 
 ```bash
 cp .env.example .env                                    # one-time setup
-docker compose up --build                                # start db, redis, api, worker
+docker compose up --build                                # start db, redis, api, worker, frontend
 docker compose run --rm api alembic upgrade head          # apply migrations (run once db is healthy)
 docker compose down                                       # stop (add -v to also drop volumes)
 ```
@@ -18,9 +18,13 @@ docker compose down                                       # stop (add -v to also
 Verify the stack:
 ```bash
 curl http://localhost:8010/health                                          # -> {"status":"ok"}
+curl http://localhost:5173/                                                 # -> the frontend SPA (200)
+curl http://localhost:5173/api/health                                       # -> {"status":"ok"} via the frontend's Vite proxy
 docker compose exec db psql -U rag -d rag -c "\dx vector"                  # confirm pgvector enabled
 docker compose exec worker celery -A app.celery_app inspect ping           # confirm worker <-> redis
 ```
+
+Frontend-only commands (run from `frontend/`, or `docker compose exec frontend <cmd>`): `npm run lint` (oxlint), `npm run typecheck` (`tsc -b --noEmit`), `npm test` (Vitest run), `npm run build` (typecheck + Vite production build).
 
 New migration: `docker compose run --rm api alembic revision --autogenerate -m "description"` (works now that models are registered on `Base` via `app/models/__init__.py`, imported by `alembic/env.py`).
 
@@ -58,11 +62,13 @@ Run tests: `docker compose exec api pytest -v`. There is no lint tooling configu
 - `tests/conftest.py` wraps each test in a real Postgres transaction (`join_transaction_mode="create_savepoint"`) rolled back afterward, and overrides the `get_db` FastAPI dependency with that same session — tests hit the real `db` service, not a mock, and never leave data behind. It also has an autouse fixture that deletes any files a test wrote under `settings.upload_dir`, since file writes (unlike DB rows) aren't covered by the transaction rollback.
 - Ingestion tests mock at the `app.ingestion.tasks` module level (`monkeypatch.setattr(tasks, "embed_texts", ...)` etc.) and call `run_ingestion` directly — never real OpenAI calls or a real Celery broker round-trip. `test_documents_api.py` similarly stubs `process_document.delay` so upload tests don't depend on (or block on) the worker actually processing anything. Retrieval/generation tests follow the same pattern: `test_retrieval_queries.py` uses real Postgres with hand-built one-hot embedding vectors (no OpenAI calls needed to test ranking/filtering), while `test_generation.py`/`test_questions_api.py`/`test_pipeline.py` monkeypatch `_client`/`embed_texts`/`generate_answer` to fake OpenAI responses. Streaming tests follow suit: `test_streaming.py` tests `_AnswerFieldExtractor`/`_decode_json_string_prefix` directly with plain strings (no mocking needed — pure functions) plus `stream_answer` against a fake async stream object (`SimpleNamespace(type=..., delta=...)`, matching the SDK's real `event.type` discriminator strings); `test_sse.py` tests `generate_question_stream_events` by monkeypatching `stream_answer` to a fake async generator; `test_questions_stream_api.py` exercises the real route via `TestClient` (note: `TestClient` buffers the whole SSE body, so it can verify event order/content but *not* true incremental delivery — that was verified separately with a real `curl -N`/Python `urllib` client against the live server, showing genuinely staggered per-token arrival timestamps, exactly per the plan's warning that buffered test clients can hide this). The real end-to-end checks (real OpenAI embeddings + real Responses API call, real Celery worker, real mid-stream client disconnect via `curl --max-time`) are manual smoke tests, not part of the automated suite.
 
+- `frontend/` — React + TypeScript + Vite + Tailwind + shadcn/ui SPA (Part 6). `src/lib/api.ts` has the typed REST client and `streamQuestion` (incremental SSE parsing via `src/lib/sse.ts`) against `/questions/stream`; `src/context/AuthContext.tsx` + `src/hooks/useAuth.ts` hold the JWT (in `sessionStorage`) and session-restore logic; `src/hooks/useDocuments.ts` handles upload/list/delete and 2s polling of queued/processing documents; `src/hooks/useQuestionStream.ts` drives the streaming ask/stop/retry flow with `AbortController`, aborting on unmount. `src/pages/WorkspacePage.tsx` is the top-level "smart parent" owning selection/citation/drawer state; everything under `src/components/` is presentational. All browser requests go to `/api/...`; Vite's dev-server proxy (`vite.config.ts`, target from `VITE_API_PROXY_TARGET`, default `http://localhost:8010` for standalone dev, `http://api:8000` in Compose) strips the prefix and forwards to FastAPI — the browser never talks cross-origin or knows the backend's real port. Vitest + React Testing Library cover SSE parsing, the API client, auth, document polling, and the citation/streaming UI flow (`npm test`).
+
 ### Docker Compose topology
 
-Four services: `db` (`pgvector/pgvector:pg16`), `redis`, `api` (uvicorn with `--reload`, bind-mounts `./app`, `./alembic`, and `./tests`), `worker` (Celery). `api` and `worker` share a bind-mounted `./uploads` folder at `/data/uploads` where uploaded documents are stored (referenced by `Document.storage_path`) — a real, gitignored directory in the project root, not a Docker-managed named volume, so uploaded files are directly browsable/inspectable from the host; `db` has a persistent `pgdata` named volume.
+Five services: `db` (`pgvector/pgvector:pg16`), `redis`, `api` (uvicorn with `--reload`, bind-mounts `./app`, `./alembic`, and `./tests`), `worker` (Celery), `frontend` (Vite dev server on `:5173`, bind-mounts `./frontend` with a named `frontend_node_modules` volume so the host bind mount doesn't shadow the container's installed `node_modules`). `api` and `worker` share a bind-mounted `./uploads` folder at `/data/uploads` where uploaded documents are stored (referenced by `Document.storage_path`) — a real, gitignored directory in the project root, not a Docker-managed named volume, so uploaded files are directly browsable/inspectable from the host; `db` has a persistent `pgdata` named volume.
 
-Host port mappings are non-default (`8010→8000` for api, `5433→5432` for db, `6380→6379` for redis) because default ports were already occupied by unrelated local services when this was set up — don't assume 8000/5432/6379 are free on this machine. Container-to-container traffic is unaffected and still uses the default ports via `DATABASE_URL`/`REDIS_URL` in `.env`.
+Host port mappings are non-default (`8010→8000` for api, `5433→5432` for db, `6380→6379` for redis) because default ports were already occupied by unrelated local services when this was set up — don't assume 8000/5432/6379 are free on this machine. Container-to-container traffic is unaffected and still uses the default ports via `DATABASE_URL`/`REDIS_URL` in `.env`. `frontend` maps `5173:5173` (Vite's default) and reaches the backend over the Compose network as `http://api:8000` (set via the `VITE_API_PROXY_TARGET` environment variable on the `frontend` service, not `.env`).
 
 `.env` (gitignored) holds `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`/`JWT_ALGORITHM`/`ACCESS_TOKEN_EXPIRE_MINUTES`, `EMBEDDING_MODEL`/`EMBEDDING_DIMENSIONS`, `OPENAI_API_KEY`/`UPLOAD_DIR`/`MAX_UPLOAD_MB`/`CHUNK_SIZE_TOKENS`/`CHUNK_OVERLAP_TOKENS`, and `CHAT_MODEL`/`REASONING_EFFORT`/`RETRIEVAL_TOP_K`/`MAX_OUTPUT_TOKENS`; `.env.example` is the committed template — keep them in sync when adding new settings. **Never read or print the real `.env` contents in a way that echoes `OPENAI_API_KEY` back into a response, log, or committed file.**
 

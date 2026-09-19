@@ -109,3 +109,26 @@ Reuse existing backend endpoints and response schemas; no database migration or 
 
 No persistent chat history, document preview/download, OCR, cloud hosting, or model changes. Part 7 remains portfolio documentation, sample documents, evaluation, and the reproducible demo.
 
+## Status: Complete
+
+All 7 steps implemented in `frontend/` (React 19 + TypeScript + Vite 8 + Tailwind v4 + shadcn/ui, React Router v7).
+
+### Verification performed
+
+- **Automated:** 45 Vitest + React Testing Library tests passing, covering SSE incremental parsing (`sse.test.ts`), the typed API client including 401 detection (`api.test.ts`), DOCX 0-based→1-based citation index formatting (`citations.test.ts`), document polling/upload/delete (`useDocuments.test.tsx`), session restore/expiry (`useAuth.test.tsx`), login form validation (`LoginPage.test.tsx`), and the end-to-end streamed question → citation → retry-on-error flow (`WorkspacePage.qa.test.tsx`, `WorkspacePage.test.tsx`).
+- `npm run lint` (oxlint), `npm run typecheck` (`tsc -b --noEmit`), and `npm run build` (production Vite build) all pass with no errors.
+- Backend regression suite (`docker compose exec api pytest -v`) re-run and still green — no backend changes were needed for Part 6.
+- **Docker integration:** `frontend` Compose service builds and starts; `curl http://localhost:5173/` returns `200` (SPA served); `curl http://localhost:5173/api/health` returns `{"status":"ok"}`, confirming the Vite proxy correctly resolves to the `api` service by Docker Compose network name (`http://api:8000`), not `localhost`; a full `POST /api/auth/login` through that same proxy returned a real JWT, confirming the proxy forwards non-GET requests and bodies correctly, not just the health check. `npm run lint && npm run typecheck && npm test && npm run build` all run clean inside the `frontend` container.
+- **Docker-specific fix:** Vitest's default parallel fork-worker pool reliably timed out starting workers inside this container (`[vitest-pool-runner]: Timeout waiting for worker to respond`) while working fine outside Docker — not a resource limit (container had 8 CPUs, <15% memory used). Fixed by setting `test.fileParallelism: false` in `vite.config.ts` so `npm test` runs test files sequentially; verified this makes `npm test` pass reliably (45/45) in both Docker and standalone environments with no extra flags.
+- **Real bug found and fixed via this verification, not assumed correct from tests alone:** `QuestionPanel.tsx`'s error state nested a `role="alert"` div around shadcn's `Alert` component, which sets `role="alert"` internally — a screen reader would have double-announced every error. Caught because `findByRole('alert')` in `WorkspacePage.qa.test.tsx` matched two elements and timed out rather than erroring immediately; fixed by removing the redundant outer role, verified by re-running the test suite.
+
+### Verification handed to the user
+
+Per an explicit choice made during planning (no GUI browser tool is available in this environment), the plan's real-browser checks — desktop/mobile responsive layout, keyboard-only navigation, and the full live click-through (register → login → upload → ready → streamed answer → inspect citation → delete, plus two-user isolation) — are the user's own responsibility to click through against `http://localhost:5173` (Docker) or a standalone `npm run dev` server, the same way API behavior was hand-verified via curl/Swagger UI in earlier parts. These are not yet confirmed by either party as of this writing.
+
+### Notable implementation decisions
+
+- JWT kept in `sessionStorage` (per spec), restored via `/auth/me` on load; expired/invalid sessions redirect to `/login`.
+- Document upload defers all format/size validation to the backend rather than duplicating its rules client-side, avoiding validation-logic drift between frontend and backend.
+- `useQuestionStream` aborts its in-flight fetch on unmount (component teardown, navigation, logout) via an `AbortController` cleaned up in a `useEffect` return function.
+- SSE parsing buffers across chunk/UTF-8/event-boundary splits rather than assuming each network chunk is a complete event — verified against the real streaming endpoint, not just synthetic single-chunk test fixtures.

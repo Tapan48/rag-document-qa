@@ -27,5 +27,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Parallel fork workers reliably time out to start under Docker Desktop's
+    // container runtime (works fine outside Docker) — run test files sequentially.
+    fileParallelism: false,
   },
 })
