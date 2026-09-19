@@ -61,27 +61,32 @@ def build_labeled_context(retrieved: list[RetrievedChunk]) -> str:
     return "\n\n".join(f"[S{i + 1}] {chunk.text}" for i, chunk in enumerate(retrieved))
 
 
+def build_messages(question: str, labeled_context: str) -> list[dict]:
+    return [
+        {"role": "system", "content": f"{_SYSTEM_PROMPT}\n\nContext:\n{labeled_context}"},
+        {"role": "user", "content": question},
+    ]
+
+
+def response_format() -> dict:
+    return {
+        "format": {
+            "type": "json_schema",
+            "name": "answer_schema",
+            "schema": _ANSWER_SCHEMA,
+            "strict": True,
+        }
+    }
+
+
 def generate_answer(question: str, labeled_context: str) -> GeneratedAnswer:
     try:
         response = _client.responses.create(
             model=settings.chat_model,
-            input=[
-                {
-                    "role": "system",
-                    "content": f"{_SYSTEM_PROMPT}\n\nContext:\n{labeled_context}",
-                },
-                {"role": "user", "content": question},
-            ],
+            input=build_messages(question, labeled_context),
             reasoning={"effort": settings.reasoning_effort},
             max_output_tokens=settings.max_output_tokens,
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "answer_schema",
-                    "schema": _ANSWER_SCHEMA,
-                    "strict": True,
-                }
-            },
+            text=response_format(),
             timeout=_PROVIDER_TIMEOUT_SECONDS,
         )
     except openai.APITimeoutError as exc:
@@ -98,7 +103,10 @@ def _parse_response(response) -> GeneratedAnswer:
     output_text = getattr(response, "output_text", None)
     if not output_text:
         raise GenerationError("Model returned no output")
+    return parse_answer_json(output_text)
 
+
+def parse_answer_json(output_text: str) -> GeneratedAnswer:
     try:
         payload = json.loads(output_text)
         answer = payload["answer"]
