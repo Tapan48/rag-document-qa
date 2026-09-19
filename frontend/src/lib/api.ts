@@ -1,5 +1,7 @@
+import { parseSseStream } from '@/lib/sse'
 import type {
   ApiErrorBody,
+  CitationOut,
   DocumentList,
   DocumentPublic,
   QuestionRequest,
@@ -88,4 +90,91 @@ export const api = {
       { method: 'POST', body: JSON.stringify(payload) },
       token,
     ),
+}
+
+export interface StreamCallbacks {
+  onAnswerDelta: (delta: string) => void
+  onCitations: (citations: CitationOut[]) => void
+  onDone: (response: QuestionResponse) => void
+  onError: (code: string, message: string) => void
+}
+
+/**
+ * Streams POST /questions/stream. Never throws for stream-level problems --
+ * every outcome (HTTP error before the stream opens, a mid-stream `error`
+ * event, malformed event payloads, or the connection closing without a
+ * `done` event) is reported via `callbacks.onError` so the caller doesn't
+ * need a try/catch around the whole flow. An aborted request (via `signal`)
+ * is treated as neither success nor error -- it resolves silently.
+ */
+export async function streamQuestion(
+  token: string,
+  payload: QuestionRequest,
+  callbacks: StreamCallbacks,
+  signal: AbortSignal,
+): Promise<void> {
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE}/questions/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      signal,
+    })
+  } catch (err) {
+    if (signal.aborted || (err as Error).name === 'AbortError') return
+    callbacks.onError('network', 'Could not reach the server')
+    return
+  }
+
+  if (!response.ok) {
+    const code = response.status === 401 ? 'unauthorized' : 'http_error'
+    callbacks.onError(code, await parseErrorBody(response))
+    return
+  }
+  if (!response.body) {
+    callbacks.onError('network', 'Streaming is not supported in this environment')
+    return
+  }
+
+  let sawDone = false
+  try {
+    for await (const { event, data } of parseSseStream(response.body)) {
+      switch (event) {
+        case 'answer': {
+          const parsed = JSON.parse(data) as { delta: string }
+          callbacks.onAnswerDelta(parsed.delta)
+          break
+        }
+        case 'citations': {
+          const parsed = JSON.parse(data) as { citations: CitationOut[] }
+          callbacks.onCitations(parsed.citations)
+          break
+        }
+        case 'done': {
+          sawDone = true
+          callbacks.onDone(JSON.parse(data) as QuestionResponse)
+          break
+        }
+        case 'error': {
+          const parsed = JSON.parse(data) as { code: string; message: string }
+          callbacks.onError(parsed.code, parsed.message)
+          return
+        }
+        default:
+          break
+      }
+    }
+  } catch (err) {
+    if (signal.aborted || (err as Error).name === 'AbortError') return
+    callbacks.onError('parse_error', 'The answer stream was interrupted')
+    return
+  }
+
+  if (!sawDone) {
+    callbacks.onError('connection_lost', 'Connection closed before the answer finished')
+  }
 }

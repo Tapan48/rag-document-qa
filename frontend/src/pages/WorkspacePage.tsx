@@ -1,10 +1,12 @@
 import { LogOut } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
+import { QuestionPanel } from '@/components/qa/QuestionPanel'
 import { DocumentSidebar } from '@/components/documents/DocumentSidebar'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useDocuments } from '@/hooks/useDocuments'
+import { useQuestionStream } from '@/hooks/useQuestionStream'
 import type { SelectionMode } from '@/types/workspace'
 
 export function WorkspacePage() {
@@ -13,6 +15,7 @@ export function WorkspacePage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const docs = useDocuments(token, logout)
+  const stream = useQuestionStream(token, logout)
 
   function handleToggleSelected(id: string, selected: boolean) {
     setSelectedIds((prev) => {
@@ -21,6 +24,21 @@ export function WorkspacePage() {
       else next.delete(id)
       return next
     })
+  }
+
+  const documentIdsForQuestion = useMemo(
+    () => (selectionMode === 'selected' ? Array.from(selectedIds) : null),
+    [selectionMode, selectedIds],
+  )
+
+  const canAsk = selectionMode === 'all' || selectedIds.size > 0
+  const disabledReason =
+    selectionMode === 'selected' && selectedIds.size === 0
+      ? 'Select at least one ready document to ask about it.'
+      : null
+
+  function handleAsk(question: string) {
+    stream.ask(question, documentIdsForQuestion)
   }
 
   return (
@@ -46,7 +64,14 @@ export function WorkspacePage() {
           />
         </aside>
 
-        <main className="flex-1 overflow-hidden p-4" />
+        <main className="flex-1 overflow-hidden p-4">
+          <QuestionPanel
+            stream={stream}
+            canAsk={canAsk}
+            disabledReason={disabledReason}
+            onAsk={handleAsk}
+          />
+        </main>
       </div>
     </div>
   )
