@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 
+import { CitationList } from '@/components/qa/CitationList'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { UseQuestionStreamResult } from '@/hooks/useQuestionStream'
+import type { CitationOut } from '@/types/api'
 
 const MAX_QUESTION_LENGTH = 2000
 
@@ -12,9 +14,16 @@ interface QuestionPanelProps {
   canAsk: boolean
   disabledReason: string | null
   onAsk: (question: string) => void
+  onSelectCitation: (citation: CitationOut) => void
 }
 
-export function QuestionPanel({ stream, canAsk, disabledReason, onAsk }: QuestionPanelProps) {
+export function QuestionPanel({
+  stream,
+  canAsk,
+  disabledReason,
+  onAsk,
+  onSelectCitation,
+}: QuestionPanelProps) {
   const [draft, setDraft] = useState('')
   const isStreaming = stream.phase === 'streaming'
 
@@ -91,6 +100,10 @@ export function QuestionPanel({ stream, canAsk, disabledReason, onAsk }: Questio
                 ) : (
                   <p className="whitespace-pre-wrap">{stream.finalResponse.answer}</p>
                 )}
+                <CitationList
+                  citations={stream.finalResponse.citations}
+                  onSelect={onSelectCitation}
+                />
               </div>
             )}
 
