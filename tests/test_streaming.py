@@ -2,10 +2,13 @@ import asyncio
 from types import SimpleNamespace
 
 import openai
+import pytest
 
 from app.retrieval import streaming
 from app.retrieval.generation import GeneratedAnswer, GenerationError, GenerationTimeoutError, GenerationUnavailableError
 from app.retrieval.streaming import (
+    INACTIVITY_TIMEOUT_SECONDS,
+    TOTAL_DEADLINE_SECONDS,
     AnswerDelta,
     _AnswerFieldExtractor,
     _decode_json_string_prefix,
@@ -37,7 +40,7 @@ def test_decode_handles_escaped_quote():
 
 
 def test_decode_handles_unicode_escape():
-    decoded, consumed, closed = _decode_json_string_prefix("caf\\u00e9" + '"')
+    decoded, consumed, closed = _decode_json_string_prefix(r"café" + '"')
     assert decoded == "café"
     assert closed is True
 
@@ -125,14 +128,17 @@ def test_extractor_ignores_empty_feed():
 
 
 class _FakeAsyncStream:
-    def __init__(self, events):
+    def __init__(self, events, delay=0.0):
         self._events = list(events)
+        self._delay = delay
         self.closed = False
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
+        if self._delay:
+            await asyncio.sleep(self._delay)
         if not self._events:
             raise StopAsyncIteration
         return self._events.pop(0)
@@ -161,6 +167,9 @@ class _FakeClient:
     def __init__(self, stream):
         self.responses = _FakeResponses(stream)
 
+    def with_options(self, **kwargs):
+        return self
+
 
 async def _collect(question="q", context="c"):
     items = []
@@ -181,6 +190,26 @@ def test_stream_answer_happy_path(monkeypatch):
     assert "".join(d.text for d in deltas) == "hi"
     assert isinstance(final, GeneratedAnswer)
     assert final.answer == "hi"
+    assert fake_stream.closed is True
+
+
+def test_stream_answer_reraises_and_closes_on_cancellation(monkeypatch):
+    class _CancelledStream(_FakeAsyncStream):
+        async def __anext__(self):
+            raise asyncio.CancelledError()
+
+    fake_stream = _CancelledStream([])
+    monkeypatch.setattr(streaming, "_async_client", _FakeClient(fake_stream))
+
+    async def consume():
+        items = []
+        async for item in stream_answer("q", "c"):
+            items.append(item)
+        return items
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(consume())
+
     assert fake_stream.closed is True
 
 
@@ -210,6 +239,17 @@ def test_stream_answer_maps_timeout_error(monkeypatch):
     items = asyncio.run(_collect())
 
     assert isinstance(items[-1], GenerationTimeoutError)
+
+
+def test_stream_answer_maps_inactivity_timeout(monkeypatch):
+    monkeypatch.setattr(streaming, "INACTIVITY_TIMEOUT_SECONDS", 0.05)
+    fake_stream = _FakeAsyncStream([_delta('{"')], delay=1.0)
+    monkeypatch.setattr(streaming, "_async_client", _FakeClient(fake_stream))
+
+    items = asyncio.run(_collect())
+
+    assert isinstance(items[-1], GenerationTimeoutError)
+    assert fake_stream.closed is True
 
 
 def test_stream_answer_no_final_text_is_generation_error(monkeypatch):

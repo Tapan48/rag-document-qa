@@ -56,11 +56,16 @@ def fallback_response() -> QuestionResponse:
 def finalize_answer(
     generated: GeneratedAnswer, retrieved: list[RetrievedChunk]
 ) -> QuestionResponse:
-    """Resolve citations and enforce the substantive-answer-needs-citations
-    rule. Raises GenerationError (transport-agnostic) on any inconsistency,
-    left for the caller to map to an HTTP error or an SSE error event."""
+    """Resolve citations and enforce answer/citation consistency: a
+    substantive answer must have at least one citation, and an
+    insufficient-evidence answer must have none. Raises GenerationError
+    (transport-agnostic) on any inconsistency, left for the caller to map to
+    an HTTP error or an SSE error event."""
     citations = resolve_citations(generated.cited_labels, retrieved)
-    if not generated.insufficient_evidence and not citations:
+    if generated.insufficient_evidence:
+        if citations:
+            raise GenerationError("Insufficient-evidence answer must not include citations")
+    elif not citations:
         raise GenerationError("Substantive answer must include at least one citation")
     return QuestionResponse(
         answer=generated.answer,

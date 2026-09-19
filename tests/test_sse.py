@@ -132,3 +132,15 @@ def test_unknown_citation_label_emits_error_not_done(monkeypatch):
 
     assert [e for e, _ in events] == ["error"]
     assert events[0][1]["code"] == "generation_failed"
+
+
+def test_insufficient_evidence_with_citations_emits_error_not_done(monkeypatch):
+    async def fake_stream_answer(question, context):
+        yield GeneratedAnswer(answer="hi", cited_labels=["S1"], insufficient_evidence=True)
+
+    monkeypatch.setattr(sse_module, "stream_answer", fake_stream_answer)
+    prepared = PreparedQuestion(question="q", retrieved=[_chunk()])
+
+    events = _parse_events(asyncio.run(_collect(prepared)))
+
+    assert [e for e, _ in events] == ["error"]

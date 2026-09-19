@@ -1,4 +1,5 @@
 import json
+from contextlib import aclosing
 from typing import AsyncIterator
 
 from app.retrieval.generation import (
@@ -38,36 +39,44 @@ async def generate_question_stream_events(prepared: PreparedQuestion) -> AsyncIt
 
     labeled_context = build_labeled_context(prepared.retrieved)
 
-    async for item in stream_answer(prepared.question, labeled_context):
-        if isinstance(item, AnswerDelta):
-            yield format_sse_event("answer", {"delta": item.text})
-        elif isinstance(item, GeneratedAnswer):
-            try:
-                response = finalize_answer(item, prepared.retrieved)
-            except GenerationError:
+    # `aclosing` guarantees stream_answer's generator is explicitly closed
+    # (running its `finally: await stream.close()`) the instant this outer
+    # generator is cancelled or garbage-collected early -- a plain
+    # `async for` does NOT call `aclose()` on the inner iterator when the
+    # *outer* generator is the one interrupted, which would otherwise leave
+    # the upstream OpenAI connection open until GC gets to it.
+    async with aclosing(stream_answer(prepared.question, labeled_context)) as events:
+        async for item in events:
+            if isinstance(item, AnswerDelta):
+                yield format_sse_event("answer", {"delta": item.text})
+            elif isinstance(item, GeneratedAnswer):
+                try:
+                    response = finalize_answer(item, prepared.retrieved)
+                except GenerationError:
+                    yield format_sse_event(
+                        "error",
+                        {"code": "generation_failed", "message": "Answer generation failed"},
+                    )
+                    return
+                yield format_sse_event(
+                    "citations",
+                    {"citations": [c.model_dump(mode="json") for c in response.citations]},
+                )
+                yield format_sse_event("done", response.model_dump(mode="json"))
+                return
+            elif isinstance(item, GenerationTimeoutError):
+                yield format_sse_event(
+                    "error", {"code": "timeout", "message": "Answer generation timed out"}
+                )
+                return
+            elif isinstance(item, GenerationUnavailableError):
+                yield format_sse_event(
+                    "error",
+                    {"code": "unavailable", "message": "Answer generation provider unavailable"},
+                )
+                return
+            elif isinstance(item, GenerationError):
                 yield format_sse_event(
                     "error", {"code": "generation_failed", "message": "Answer generation failed"}
                 )
                 return
-            yield format_sse_event(
-                "citations",
-                {"citations": [c.model_dump(mode="json") for c in response.citations]},
-            )
-            yield format_sse_event("done", response.model_dump(mode="json"))
-            return
-        elif isinstance(item, GenerationTimeoutError):
-            yield format_sse_event(
-                "error", {"code": "timeout", "message": "Answer generation timed out"}
-            )
-            return
-        elif isinstance(item, GenerationUnavailableError):
-            yield format_sse_event(
-                "error",
-                {"code": "unavailable", "message": "Answer generation provider unavailable"},
-            )
-            return
-        elif isinstance(item, GenerationError):
-            yield format_sse_event(
-                "error", {"code": "generation_failed", "message": "Answer generation failed"}
-            )
-            return

@@ -1,3 +1,4 @@
+import asyncio
 import re
 from dataclasses import dataclass
 from typing import AsyncIterator, Union
@@ -17,6 +18,9 @@ from app.retrieval.generation import (
 )
 
 _async_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
+
+INACTIVITY_TIMEOUT_SECONDS = 20.0
+TOTAL_DEADLINE_SECONDS = 60.0
 
 _ANSWER_KEY_PATTERN = '"answer"'
 _VALUE_START_RE = re.compile(r'\s*:\s*"')
@@ -47,27 +51,42 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
     the failure. Never raises -- the terminal value is how callers learn the
     outcome, so this can be consumed with a plain `async for` and no
     try/except around iteration itself.
+
+    Enforces a 20s per-event inactivity timeout and a 60s total generation
+    deadline, and disables the SDK's automatic retries (a mid-stream retry
+    would duplicate already-emitted answer text).
     """
     extractor = _AnswerFieldExtractor()
-    stream = await _async_client.responses.create(
-        model=settings.chat_model,
-        input=build_messages(question, labeled_context),
-        reasoning={"effort": settings.reasoning_effort},
-        max_output_tokens=settings.max_output_tokens,
-        text=response_format(),
-        stream=True,
-    )
-
+    client = _async_client.with_options(max_retries=0)
+    stream = None
     final_text: str | None = None
+
     try:
-        async for event in stream:
-            if event.type == "response.output_text.delta":
-                piece = extractor.feed(event.delta)
-                if piece:
-                    yield AnswerDelta(piece)
-            elif event.type == "response.output_text.done":
-                final_text = event.text
-    except openai.APITimeoutError as exc:
+        async with asyncio.timeout(TOTAL_DEADLINE_SECONDS):
+            stream = await client.responses.create(
+                model=settings.chat_model,
+                input=build_messages(question, labeled_context),
+                reasoning={"effort": settings.reasoning_effort},
+                max_output_tokens=settings.max_output_tokens,
+                text=response_format(),
+                stream=True,
+            )
+
+            while True:
+                try:
+                    event = await asyncio.wait_for(
+                        stream.__anext__(), timeout=INACTIVITY_TIMEOUT_SECONDS
+                    )
+                except StopAsyncIteration:
+                    break
+
+                if event.type == "response.output_text.delta":
+                    piece = extractor.feed(event.delta)
+                    if piece:
+                        yield AnswerDelta(piece)
+                elif event.type == "response.output_text.done":
+                    final_text = event.text
+    except (asyncio.TimeoutError, openai.APITimeoutError) as exc:
         yield GenerationTimeoutError(str(exc))
         return
     except _TRANSIENT_OPENAI_ERRORS as exc:
@@ -76,8 +95,15 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
     except openai.OpenAIError as exc:
         yield GenerationError(str(exc))
         return
+    except (asyncio.CancelledError, GeneratorExit):
+        # CancelledError: Starlette/uvicorn cancelling the request task on a
+        # real client disconnect. GeneratorExit: someone calling
+        # `.aclose()` on this generator directly (e.g. via `aclosing`).
+        # Both must be re-raised, never swallowed.
+        raise
     finally:
-        await stream.close()
+        if stream is not None:
+            await stream.close()
 
     if final_text is None:
         yield GenerationError("Model returned no output")

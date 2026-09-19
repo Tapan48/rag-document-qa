@@ -117,3 +117,17 @@ def test_finalize_answer_allows_insufficient_evidence_without_citations(db_sessi
 
     assert response.insufficient_evidence is True
     assert response.citations == []
+
+
+def test_finalize_answer_raises_on_insufficient_evidence_with_citations(db_session):
+    owner = _create_user(db_session, "owner@example.com")
+    _create_ready_document_with_chunk(db_session, owner)
+    from app.retrieval.queries import retrieve_chunks
+
+    retrieved = retrieve_chunks(db_session, owner.id, _one_hot(0), top_k=5)
+    generated = GeneratedAnswer(
+        answer="not enough info", cited_labels=["S1"], insufficient_evidence=True
+    )
+
+    with pytest.raises(GenerationError):
+        finalize_answer(generated, retrieved)
