@@ -2,9 +2,9 @@
 
 ## Goal and stack
 
-Build a portfolio backend where users upload documents, ask questions, and receive streamed answers with source citations.
+Build a portfolio full-stack application where users upload documents, ask questions, and receive streamed answers with source citations through a React workspace.
 
-**Stack:** Python, FastAPI, PostgreSQL + pgvector, Celery, Redis, OpenAI, JWT authentication, Docker Compose.
+**Stack:** Python, FastAPI, PostgreSQL + pgvector, Celery, Redis, OpenAI, JWT authentication, Docker Compose, React, TypeScript, Vite, Tailwind CSS, shadcn/ui.
 
 ## Implementation parts
 
@@ -51,7 +51,16 @@ Build a portfolio backend where users upload documents, ask questions, and recei
 
 
 
-### Part 6 — Portfolio documentation
+### Part 6 — Frontend
+
+- Build a single workspace (document sidebar, central Q&A, citation panel) in React + TypeScript + Vite + Tailwind + shadcn/ui.
+- Add authenticated registration/login, session restore via `/auth/me`, and logout.
+- Add document upload, list with pagination/status, polling of in-progress documents, and delete.
+- Add streamed question answering against `POST /questions/stream` with incremental SSE parsing, provisional vs. authoritative answers, and cancellation.
+- Add a citation viewer and accessible (keyboard/ARIA/mobile) workspace states.
+- Integrate a frontend dev service into Docker Compose, proxied to the API; add lint/typecheck/test/build commands.
+
+### Part 7 — Portfolio documentation
 
 - Write setup instructions, API examples, an architecture diagram, and limitations.
 - Prepare sample documents and a reproducible upload-to-answer demonstration.
@@ -66,11 +75,12 @@ Build a portfolio backend where users upload documents, ask questions, and recei
 - Test streaming success and failure.
 - Mock providers in automated tests; verify one complete flow with real API calls.
 - Evaluate 15 questions against expected supporting passages.
+- Validate frontend browser flows, accessibility, and error states (see Part 6).
 
 
 
 ## Defaults
 
-Backend-only, local Docker deployment, Swagger for API exploration. No OCR, frontend, agents, or cloud hosting in v1. Keep model names configurable.
+Local full-stack application (backend + React frontend), Docker Compose, Swagger for direct API exploration. No OCR, cloud hosting, or agents in v1. Keep model names configurable.
 
 **Claude handoff:** Implement each part in order, explain the changes, and verify its behavior before moving forward.
