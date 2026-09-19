@@ -1,12 +1,31 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { AuthProvider } from '@/context/AuthContext'
+import { LoginPage } from '@/pages/LoginPage'
+import { RegisterPage } from '@/pages/RegisterPage'
+
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<div>Login</div>} />
-      <Route path="/register" element={<div>Register</div>} />
-      <Route path="/workspace" element={<div>Workspace</div>} />
-      <Route path="*" element={<Navigate to="/workspace" replace />} />
-    </Routes>
+    <AuthProvider>
+      <TooltipProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/workspace"
+            element={
+              <ProtectedRoute>
+                <div>Workspace</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/workspace" replace />} />
+        </Routes>
+        <Toaster />
+      </TooltipProvider>
+    </AuthProvider>
   )
 }
