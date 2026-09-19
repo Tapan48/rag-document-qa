@@ -56,7 +56,7 @@ Run tests: `docker compose exec api pytest -v`. There is no lint tooling configu
 
 ### Docker Compose topology
 
-Four services: `db` (`pgvector/pgvector:pg16`), `redis`, `api` (uvicorn with `--reload`, bind-mounts `./app`, `./alembic`, and `./tests`), `worker` (Celery). `api` and `worker` share a named `uploads` volume at `/data/uploads` where uploaded documents are stored (referenced by `Document.storage_path`); `db` has a persistent `pgdata` volume.
+Four services: `db` (`pgvector/pgvector:pg16`), `redis`, `api` (uvicorn with `--reload`, bind-mounts `./app`, `./alembic`, and `./tests`), `worker` (Celery). `api` and `worker` share a bind-mounted `./uploads` folder at `/data/uploads` where uploaded documents are stored (referenced by `Document.storage_path`) — a real, gitignored directory in the project root, not a Docker-managed named volume, so uploaded files are directly browsable/inspectable from the host; `db` has a persistent `pgdata` named volume.
 
 Host port mappings are non-default (`8010→8000` for api, `5433→5432` for db, `6380→6379` for redis) because default ports were already occupied by unrelated local services when this was set up — don't assume 8000/5432/6379 are free on this machine. Container-to-container traffic is unaffected and still uses the default ports via `DATABASE_URL`/`REDIS_URL` in `.env`.
 

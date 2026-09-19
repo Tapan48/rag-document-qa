@@ -42,7 +42,7 @@ services:
       - ./app:/app/app
       - ./alembic:/app/alembic
       - ./tests:/app/tests
-      - uploads:/data/uploads
+      - ./uploads:/data/uploads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
@@ -56,9 +56,8 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/app/app
-      - uploads:/data/uploads
+      - ./uploads:/data/uploads
     command: celery -A app.celery_app worker --loglevel=info
 
 volumes:
   pgdata:
-  uploads:

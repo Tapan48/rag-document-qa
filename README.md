@@ -148,4 +148,7 @@ transaction that's rolled back afterward, so nothing persists.
 docker compose down
 ```
 
-Add `-v` to also remove the `pgdata`/`uploads` volumes and start clean.
+Add `-v` to also remove the `pgdata` volume and start clean. Uploaded files
+live in the `uploads/` folder in the project root (a real, gitignored
+directory, not a Docker volume) — delete it manually if you want to clear
+those too.
