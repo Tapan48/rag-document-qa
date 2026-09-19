@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 from dataclasses import dataclass
 from typing import AsyncIterator, Union
@@ -16,6 +17,8 @@ from app.retrieval.generation import (
     parse_answer_json,
     response_format,
 )
+
+logger = logging.getLogger(__name__)
 
 _async_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -51,10 +54,6 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
     the failure. Never raises -- the terminal value is how callers learn the
     outcome, so this can be consumed with a plain `async for` and no
     try/except around iteration itself.
-
-    Enforces a 20s per-event inactivity timeout and a 60s total generation
-    deadline, and disables the SDK's automatic retries (a mid-stream retry
-    would duplicate already-emitted answer text).
     """
     extractor = _AnswerFieldExtractor()
     client = _async_client.with_options(max_retries=0)
@@ -87,12 +86,15 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
                 elif event.type == "response.output_text.done":
                     final_text = event.text
     except (asyncio.TimeoutError, openai.APITimeoutError) as exc:
+        logger.warning("streaming answer generation timed out")
         yield GenerationTimeoutError(str(exc))
         return
     except _TRANSIENT_OPENAI_ERRORS as exc:
+        logger.warning("streaming answer generation provider unavailable: %s", type(exc).__name__)
         yield GenerationUnavailableError(str(exc))
         return
     except openai.OpenAIError as exc:
+        logger.warning("streaming answer generation failed: %s", type(exc).__name__)
         yield GenerationError(str(exc))
         return
     except (asyncio.CancelledError, GeneratorExit):
@@ -100,19 +102,26 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
         # real client disconnect. GeneratorExit: someone calling
         # `.aclose()` on this generator directly (e.g. via `aclosing`).
         # Both must be re-raised, never swallowed.
+        logger.info("streaming answer generation cancelled (client disconnected)")
         raise
     finally:
         if stream is not None:
             await stream.close()
 
     if final_text is None:
+        logger.warning("streaming answer generation produced no output")
         yield GenerationError("Model returned no output")
         return
 
     try:
-        yield parse_answer_json(final_text)
+        result = parse_answer_json(final_text)
     except GenerationError as exc:
+        logger.warning("streaming answer generation returned malformed output")
         yield exc
+        return
+
+    logger.info("streaming answer generation completed (%d chars)", len(result.answer))
+    yield result
 
 
 class _AnswerFieldExtractor:

@@ -4,9 +4,9 @@ Backend for a RAG (Retrieval-Augmented Generation) document Q&A app.
 Part 1 set up the project skeleton; Part 2 added user registration, login,
 JWT authentication, and the `users`/`documents`/`chunks` tables; Part 3 added
 document upload, text extraction, chunking, and embedding generation via a
-Celery background pipeline; Part 4 adds owner-scoped vector retrieval and
-grounded, cited question answering. Streaming is not implemented yet —
-see `plan/`.
+Celery background pipeline; Part 4 added owner-scoped vector retrieval and
+grounded, cited question answering; Part 5 adds a streaming version of
+question answering over Server-Sent Events. See `plan/`.
 
 ## Stack
 
@@ -119,6 +119,49 @@ citations instead of a fabricated answer.
 omit the field entirely to search everything. Provider failures map to
 `503` (unavailable), `504` (timeout), or `502` (malformed/refused output) —
 never a raw provider error.
+
+## Streaming questions
+
+```bash
+curl -N -X POST http://localhost:8010/questions/stream \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is this document about?"}'
+```
+
+`-N` (`--no-buffer`) is required for curl to print each line as it arrives
+instead of waiting for the connection to close. Same request body and the
+same validation as `POST /questions` (ownership/readiness checks, blank
+question, empty `document_ids` — all rejected with ordinary HTTP errors
+*before* the stream opens, exactly like the non-streaming endpoint). Once
+the stream opens (`Content-Type: text/event-stream`), it emits a sequence
+of SSE events:
+
+| Event | Payload | Meaning |
+|---|---|---|
+| `answer` | `{"delta": "..."}` | A newly-generated fragment of the answer text |
+| `citations` | `{"citations": [...]}` | The final, resolved list of citations |
+| `done` | The full `QuestionResponse` (`answer`, `citations`, `insufficient_evidence`) | Authoritative final result |
+| `error` | `{"code": "...", "message": "..."}` | Something failed; no `done` follows |
+
+Successful order is zero-or-more `answer` events, then exactly one
+`citations` event, then exactly one `done` event. On failure, exactly one
+`error` event is emitted instead and the stream ends — **never** treat text
+from `answer` events as final; only the `done` event's `answer` field is
+authoritative. If no ready documents exist at all, the stream skips
+generation entirely and goes straight to `citations` (empty) then `done`
+(the same fallback response as the non-streaming endpoint).
+
+`error.code` is one of `timeout` (exceeded the 60s total generation
+deadline or 20s provider-inactivity timeout), `unavailable` (provider rate
+limit/connection/server error), or `generation_failed` (malformed/refused
+model output, or an internal citation-consistency check failed).
+
+Browser clients: `EventSource` cannot send a `POST` body or custom headers,
+so this endpoint isn't consumable via plain `new EventSource(url)`. Use
+`fetch()` with a `ReadableStream` reader (or a library like
+`@microsoft/fetch-event-source`) to read the SSE body from a `POST`
+response instead.
 
 ## Run tests
 

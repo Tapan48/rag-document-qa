@@ -1,9 +1,13 @@
+import logging
+
 from fastapi import FastAPI
 
 from app.api.auth import router as auth_router
 from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.api.questions import router as questions_router
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 
 app = FastAPI(title="RAG Document Q&A")
 
