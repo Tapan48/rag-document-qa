@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/context/AuthContext'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { WorkspacePage } from '@/pages/WorkspacePage'
 
 export default function App() {
   return (
@@ -18,7 +19,7 @@ export default function App() {
             path="/workspace"
             element={
               <ProtectedRoute>
-                <div>Workspace</div>
+                <WorkspacePage />
               </ProtectedRoute>
             }
           />
