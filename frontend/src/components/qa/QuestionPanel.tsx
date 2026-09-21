@@ -55,6 +55,14 @@ export function QuestionPanel({
             {draft.length}/{MAX_QUESTION_LENGTH}
           </span>
           <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!draft || isStreaming}
+              onClick={() => setDraft('')}
+            >
+              Clear
+            </Button>
             {isStreaming ? (
               <Button type="button" variant="outline" onClick={stream.stop}>
                 Stop
