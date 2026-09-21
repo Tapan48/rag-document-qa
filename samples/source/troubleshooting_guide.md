@@ -1,0 +1,33 @@
+# Solstice Home Hub SH-100 — Troubleshooting Guide
+
+Hub will not power on
+Check that the USB-C cable is fully seated in the hub and the adapter.
+Try a different power outlet. If the hub still will not power on, hold the
+reset button on the base for 10 seconds and try again.
+
+Blinking red LED (connectivity error)
+Confirm your Wi-Fi router has its 2.4GHz or 5GHz band enabled. Move the hub
+closer to the router. Restart the router, then re-run setup in the app.
+
+Solid red LED (firmware update failed)
+Do not unplug the hub. It will automatically retry the update up to 3 times
+over the next 10 minutes. If the LED is still solid red after 3 retries,
+factory reset the hub and re-pair it.
+
+Factory reset steps
+Hold the reset button on the base of the hub for 15 seconds, until the LED
+flashes white. The hub returns to pairing mode. Re-add it in the Solstice
+Home app as if it were new.
+
+Persistent red LED after a factory reset
+If a blinking red or solid red LED continues after a factory reset, this
+indicates a hardware fault rather than a setup problem. If the hub is still
+within its 12-month warranty, contact support through the app to request a
+replacement at no cost. If the warranty has expired, the standard $39.99
+flat-fee repair applies instead.
+
+Devices dropping offline randomly
+Check the app for an available firmware update. Confirm you have not
+exceeded the maximum of 150 connected devices -- going over this limit can
+cause devices to drop offline. If you are near the limit, remove unused
+devices or reboot the hub weekly to reduce mesh network congestion.
