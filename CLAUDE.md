@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Parts 1–6 (Foundation, Authentication and Ownership, Document Ingestion, Retrieval and Answers, Streaming and Failures, Frontend) are complete — see `plan/part1_foundation.md` through `plan/part6_frontend.md` for what was built and how it was verified. The full roadmap (Part 7, portfolio docs) is in `plan/PLAN_main.md`.
+All 7 parts (Foundation, Authentication and Ownership, Document Ingestion, Retrieval and Answers, Streaming and Failures, Frontend, Portfolio Documentation) are complete — see `plan/part1_foundation.md` through `plan/part7_portfolio_documentation.md` for what was built and how it was verified. The full roadmap is in `plan/PLAN_main.md`. Portfolio-facing docs live in `docs/` (`ARCHITECTURE.md`, `API_REFERENCE.md`, `DEMO.md`, `EVALUATION.md`) and fictional sample documents in `samples/`.
 
 ## Commands
 
