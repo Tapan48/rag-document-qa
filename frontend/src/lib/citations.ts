@@ -59,3 +59,14 @@ export function formatSourceMetadata(metadata: Record<string, unknown>): string 
 
   return parts.length > 0 ? parts.join(' · ') : 'Source location unavailable'
 }
+
+/**
+ * Collapses whitespace runs (including newlines) in a citation passage down
+ * to single spaces. PDF extraction emits one line per visual text run for
+ * table-heavy layouts, so a passage can otherwise render as one word per
+ * line -- this is purely a display cleanup, the underlying chunk text and
+ * citation accuracy are unaffected.
+ */
+export function normalizePassageText(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}

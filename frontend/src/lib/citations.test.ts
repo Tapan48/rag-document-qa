@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatSourceMetadata } from '@/lib/citations'
+import { formatSourceMetadata, normalizePassageText } from '@/lib/citations'
 
 describe('formatSourceMetadata', () => {
   it('formats a single page', () => {
@@ -36,5 +36,25 @@ describe('formatSourceMetadata', () => {
 
   it('falls back to a placeholder when no known keys are present', () => {
     expect(formatSourceMetadata({})).toBe('Source location unavailable')
+  })
+})
+
+describe('normalizePassageText', () => {
+  it('collapses one-word-per-line PDF table extraction into flowing text', () => {
+    expect(normalizePassageText('or\n\nsession\n\nauth\n\n—\n\nyour\n\nchoice,')).toBe(
+      'or session auth — your choice,',
+    )
+  })
+
+  it('collapses runs of spaces and tabs too', () => {
+    expect(normalizePassageText('hello   \t  world')).toBe('hello world')
+  })
+
+  it('trims leading and trailing whitespace', () => {
+    expect(normalizePassageText('  \n hello world \n  ')).toBe('hello world')
+  })
+
+  it('leaves already-normal text unchanged', () => {
+    expect(normalizePassageText('a plain sentence.')).toBe('a plain sentence.')
   })
 })

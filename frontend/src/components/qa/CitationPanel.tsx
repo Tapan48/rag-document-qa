@@ -5,7 +5,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { formatSourceMetadata } from '@/lib/citations'
+import { formatSourceMetadata, normalizePassageText } from '@/lib/citations'
 import type { CitationOut } from '@/types/api'
 
 interface CitationPanelProps {
@@ -30,7 +30,7 @@ export function CitationPanel({ citation, onOpenChange }: CitationPanelProps) {
                 Supporting passage
               </p>
               <pre className="max-h-[60vh] overflow-y-auto rounded-md bg-muted p-3 text-sm whitespace-pre-wrap">
-                {citation.text}
+                {normalizePassageText(citation.text)}
               </pre>
             </div>
           </>
