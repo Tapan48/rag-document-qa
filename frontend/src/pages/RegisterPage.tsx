@@ -6,10 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
+import { useRegistrationConfig } from '@/hooks/useRegistrationConfig'
 import { ApiError } from '@/lib/api'
 
 export function RegisterPage() {
   const { register, status } = useAuth()
+  const registration = useRegistrationConfig()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,7 +36,9 @@ export function RegisterPage() {
       await register(email, password)
       navigate('/login', { replace: true, state: { justRegistered: true } })
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
+      if (err instanceof ApiError && err.status === 403) {
+        setError('Access is by invitation. Ask the person who shared this demo for an account.')
+      } else if (err instanceof ApiError && err.status === 409) {
         setError('An account with that email already exists.')
       } else {
         setError('Could not create your account. Please try again.')
@@ -48,11 +52,20 @@ export function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Create an account</CardTitle>
-          <CardDescription>Upload documents and ask grounded questions.</CardDescription>
+          <CardTitle>{registration === 'disabled' ? 'Invite-only access' : 'Create an account'}</CardTitle>
+          <CardDescription>
+            {registration === 'disabled'
+              ? 'Ask the person who shared this demo for an account.'
+              : 'Upload documents and ask grounded questions.'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          {registration === 'loading' && <p role="status">Checking registration availability…</p>}
+          {registration === 'error' && <p role="alert">Could not check registration availability. Reload to try again.</p>}
+          {registration !== 'enabled' && (
+            <Link to="/login" className="text-primary underline underline-offset-4">Sign in</Link>
+          )}
+          {registration === 'enabled' && <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -94,7 +107,7 @@ export function RegisterPage() {
                 Sign in
               </Link>
             </p>
-          </form>
+          </form>}
         </CardContent>
       </Card>
     </div>

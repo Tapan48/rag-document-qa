@@ -55,6 +55,7 @@ async function request<T>(
 }
 
 export const api = {
+  authConfig: () => request<{ registration_enabled: boolean }>('/auth/config'),
   register: (email: string, password: string) =>
     request<UserPublic>('/auth/register', {
       method: 'POST',

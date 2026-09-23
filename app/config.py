@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    registration_enabled: bool = True
 
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536

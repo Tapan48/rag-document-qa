@@ -6,10 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
+import { useRegistrationConfig } from '@/hooks/useRegistrationConfig'
 import { ApiError } from '@/lib/api'
 
 export function LoginPage() {
   const { login, status } = useAuth()
+  const registration = useRegistrationConfig()
   const navigate = useNavigate()
   const location = useLocation()
   const justRegistered = Boolean((location.state as { justRegistered?: boolean } | null)?.justRegistered)
@@ -84,12 +86,17 @@ export function LoginPage() {
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Signing in…' : 'Sign in'}
             </Button>
-            <p className="text-center text-sm text-muted-foreground">
+            {registration === 'enabled' && <p className="text-center text-sm text-muted-foreground">
               No account?{' '}
               <Link to="/register" className="text-primary underline underline-offset-4">
                 Register
               </Link>
-            </p>
+            </p>}
+            {registration === 'disabled' && (
+              <p className="text-center text-sm text-muted-foreground">
+                Access is by invitation. Ask the person who shared this demo for an account.
+              </p>
+            )}
           </form>
         </CardContent>
       </Card>
