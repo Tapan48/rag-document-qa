@@ -64,3 +64,32 @@ def test_unwritable_upload_directory_blocks_startup(monkeypatch, production_env,
     with pytest.raises(SystemExit):
         entrypoint.main()
     assert "writable" in capsys.readouterr().err
+
+
+def test_approval_requires_mail_configuration(monkeypatch, production_env, capsys):
+    monkeypatch.setenv('REGISTRATION_MODE', 'approval')
+    monkeypatch.delenv('SMTP_PASSWORD', raising=False)
+    with pytest.raises(SystemExit):
+        entrypoint.main()
+    assert 'SMTP_USERNAME and SMTP_PASSWORD' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('url', ['http://example.com', 'https://example.com/path', 'https://user:secret@example.com', 'https://example.com?x=1'])
+def test_approval_rejects_unsafe_public_origin(monkeypatch, production_env, capsys, url):
+    monkeypatch.setenv('REGISTRATION_MODE', 'approval')
+    monkeypatch.setenv('SMTP_USERNAME', 'owner@example.com')
+    monkeypatch.setenv('SMTP_PASSWORD', 'test-only-app-password')
+    monkeypatch.setenv('PUBLIC_APP_URL', url)
+    with pytest.raises(SystemExit): entrypoint.main()
+    assert url not in capsys.readouterr().err
+
+
+def test_approval_accepts_valid_mail_settings(monkeypatch, production_env):
+    monkeypatch.setenv('REGISTRATION_MODE', 'approval')
+    monkeypatch.setenv('SMTP_USERNAME', 'owner@example.com')
+    monkeypatch.setenv('SMTP_PASSWORD', 'test-only-app-password')
+    monkeypatch.setenv('PUBLIC_APP_URL', 'https://example.com')
+    called = []
+    monkeypatch.setattr(os, 'execvp', lambda *args: called.append(args))
+    entrypoint.main()
+    assert called

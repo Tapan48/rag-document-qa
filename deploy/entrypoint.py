@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from urllib.parse import urlsplit
 
 from sqlalchemy.engine import URL
 
@@ -37,6 +38,15 @@ def main() -> None:
         key = os.environ.get("OPENAI_API_KEY", "").strip()
         if not key or key.lower() in {"change-me", "changeme", "replace-me"}:
             fail("OPENAI_API_KEY is required")
+        mode = os.environ.get("REGISTRATION_MODE", "")
+        if mode and mode not in {"open", "approval", "closed"}:
+            fail("REGISTRATION_MODE must be open, approval, or closed")
+        if mode == "approval":
+            if not os.environ.get("SMTP_USERNAME", "").strip() or not os.environ.get("SMTP_PASSWORD", "").strip():
+                fail("approval mode requires SMTP_USERNAME and SMTP_PASSWORD")
+            url = urlsplit(os.environ.get("PUBLIC_APP_URL", ""))
+            if url.scheme != "https" or not url.hostname or url.username or url.password or url.query or url.fragment or url.path not in {"", "/"}:
+                fail("approval mode requires an HTTPS PUBLIC_APP_URL origin")
         upload_dir = Path(os.environ.get("UPLOAD_DIR", "/data/uploads"))
         upload_dir.mkdir(parents=True, exist_ok=True)
         if not os.access(upload_dir, os.W_OK):

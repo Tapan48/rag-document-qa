@@ -4,9 +4,13 @@ services:
   api:
     environment:
       REGISTRATION_ENABLED: "false"
+      REGISTRATION_MODE: ${REGISTRATION_MODE:-closed}
+      PUBLIC_APP_URL: https://${PUBLIC_HOSTNAME:?Set PUBLIC_HOSTNAME}
   worker:
     environment:
       REGISTRATION_ENABLED: "false"
+      REGISTRATION_MODE: ${REGISTRATION_MODE:-closed}
+      PUBLIC_APP_URL: https://${PUBLIC_HOSTNAME:?Set PUBLIC_HOSTNAME}
   frontend:
     command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.public", "--adapter", "caddyfile"]
     environment:
