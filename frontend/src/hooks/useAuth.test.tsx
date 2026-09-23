@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import type { UserPublic } from '@/types/api'
 
-const USER: UserPublic = { id: 'u1', email: 'a@example.com', created_at: '2026-01-01T00:00:00Z' }
+const USER: UserPublic = { id: 'u1', is_admin: false, email: 'a@example.com', created_at: '2026-01-01T00:00:00Z' }
 
 function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>

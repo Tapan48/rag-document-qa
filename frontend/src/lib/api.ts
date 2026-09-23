@@ -8,6 +8,8 @@ import type {
   QuestionResponse,
   Token,
   UserPublic,
+  RegistrationMode,
+  AccessRequestPublic,
 } from '@/types/api'
 
 const API_BASE = '/api'
@@ -55,11 +57,17 @@ async function request<T>(
 }
 
 export const api = {
-  authConfig: () => request<{ registration_enabled: boolean }>('/auth/config'),
-  register: (email: string, password: string) =>
+  authConfig: () => request<{ registration_enabled: boolean; registration_mode?: RegistrationMode }>('/auth/config'),
+  requestAccess: (email: string) => request<{ message: string }>('/auth/access-requests', { method: 'POST', body: JSON.stringify({ email }) }),
+  validateInvitation: (token: string) => request<{ email: string; expires_at: string }>('/auth/invitations/validate', { method: 'POST', body: JSON.stringify({ token }) }),
+  accessRequests: (token: string, offset = 0) => request<AccessRequestPublic[]>(`/admin/access-requests?offset=${offset}&limit=20`, {}, token),
+  approveAccess: (token: string, id: string) => request<AccessRequestPublic>(`/admin/access-requests/${id}/approve`, { method: 'POST' }, token),
+  rejectAccess: (token: string, id: string) => request<AccessRequestPublic>(`/admin/access-requests/${id}/reject`, { method: 'POST' }, token),
+  retryAccessEmail: (token: string, id: string) => request<{ message: string }>(`/admin/access-emails/${id}/retry`, { method: 'POST' }, token),
+  register: (email: string, password: string, invitationToken?: string) =>
     request<UserPublic>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, ...(invitationToken ? { invitation_token: invitationToken } : {}) }),
     }),
 
   login: (email: string, password: string) =>

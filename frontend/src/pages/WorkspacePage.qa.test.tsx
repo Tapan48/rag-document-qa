@@ -10,7 +10,7 @@ import type { StreamCallbacks } from '@/lib/api'
 import { WorkspacePage } from '@/pages/WorkspacePage'
 import type { CitationOut, DocumentPublic, UserPublic } from '@/types/api'
 
-const USER: UserPublic = { id: 'u1', email: 'a@example.com', created_at: '2026-01-01T00:00:00Z' }
+const USER: UserPublic = { id: 'u1', is_admin: false, email: 'a@example.com', created_at: '2026-01-01T00:00:00Z' }
 const DOC: DocumentPublic = {
   id: 'd1',
   filename: 'assignment.pdf',

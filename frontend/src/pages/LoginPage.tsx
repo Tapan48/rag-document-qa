@@ -15,13 +15,14 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const justRegistered = Boolean((location.state as { justRegistered?: boolean } | null)?.justRegistered)
+  const destination = (location.state as { from?: string } | null)?.from === '/admin/access-requests' ? '/admin/access-requests' : '/workspace'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (status === 'authenticated') {
-    return <Navigate to="/workspace" replace />
+    return <Navigate to={destination} replace />
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -30,7 +31,7 @@ export function LoginPage() {
     setIsSubmitting(true)
     try {
       await login(email, password)
-      navigate('/workspace', { replace: true })
+      navigate(destination, { replace: true })
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -97,6 +98,7 @@ export function LoginPage() {
                 Access is by invitation. Ask the person who shared this demo for an account.
               </p>
             )}
+            {registration === 'approval' && <p className="text-center text-sm text-muted-foreground">New here? <Link to="/request-access" className="text-primary underline">Request access</Link></p>}
           </form>
         </CardContent>
       </Card>

@@ -12,7 +12,7 @@ export interface AuthContextValue {
   user: UserPublic | null
   status: AuthStatus
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<UserPublic>
+  register: (email: string, password: string, invitationToken?: string) => Promise<UserPublic>
   logout: () => void
 }
 
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authenticated')
   }, [])
 
-  const register = useCallback((email: string, password: string) => api.register(email, password), [])
+  const register = useCallback((email: string, password: string, invitationToken?: string) => api.register(email, password, invitationToken), [])
 
   const logout = useCallback(() => {
     clearSession()

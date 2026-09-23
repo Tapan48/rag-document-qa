@@ -1,7 +1,27 @@
 export interface UserPublic {
   id: string
   email: string
+  is_admin: boolean
   created_at: string
+}
+
+export type RegistrationMode = 'open' | 'approval' | 'closed'
+export interface AccessEmailPublic {
+  id: string
+  kind: 'notification' | 'invitation'
+  status: 'pending' | 'retrying' | 'sent' | 'failed' | 'cancelled'
+  attempts: number
+  error: string | null
+  created_at: string
+  updated_at: string
+}
+export interface AccessRequestPublic {
+  id: string
+  email: string
+  status: 'pending' | 'approved' | 'rejected' | 'registered'
+  expires_at: string | null
+  created_at: string
+  deliveries: AccessEmailPublic[]
 }
 
 export interface Token {

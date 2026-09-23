@@ -1,5 +1,6 @@
 import { LogOut, PanelLeft } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { CitationPanel } from '@/components/qa/CitationPanel'
 import { QuestionPanel } from '@/components/qa/QuestionPanel'
@@ -80,6 +81,7 @@ export function WorkspacePage() {
           <h1 className="text-lg font-semibold">Document Q&A</h1>
         </div>
         <div className="flex items-center gap-3">
+          {user?.is_admin && <Link to="/admin/access-requests" className="text-sm text-primary underline">Access requests</Link>}
           {user && <span className="hidden text-sm text-muted-foreground sm:inline">{user.email}</span>}
           <Button variant="outline" size="sm" onClick={handleLogout}>
             <LogOut className="size-4" /> Log out
