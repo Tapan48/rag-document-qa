@@ -14,8 +14,13 @@ Follow `docs/DEPLOYMENT.md` for migration ordering, SSH-tunnel access, and recov
 Never print real environment files or stage SSH keys, backups, or the local assignment PDF.
 The base production stack is localhost-only. Authorized public deployments add
 `compose.public.yml` and `frontend/Caddyfile.public`; see `docs/PUBLIC_DEPLOYMENT.md`.
-The public override forces registration off. Reviewer accounts use
-`python -m app.cli create-user --email EMAIL` with a hidden terminal password prompt.
+The public override defaults to `REGISTRATION_MODE=closed`; configured public
+access uses `approval`. `app/access/` handles requests, single-use email-bound
+invitations, atomic Redis notification admission, and Celery SMTP delivery.
+Admin access must be explicitly granted with `python -m app.cli grant-admin --email EMAIL`.
+The server-only `create-user` command remains available for recovery.
+Never log invitation tokens, SMTP responses, or SMTP passwords. Keep mail
+credentials in the ignored server env file; use mocked SMTP in tests.
 Keep the same Compose project name to preserve database, upload, and TLS volumes.
 
 ```bash

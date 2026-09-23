@@ -1,8 +1,9 @@
-# Public HTTPS and invite-only access
+# Public HTTPS and approved registration
 
 This extends [the private production stack](DEPLOYMENT.md) on the same server.
-Use Docker Compose 2.24.4 or newer (`!override` support). There are no new
-database migrations. Existing accounts, documents, and vectors remain intact.
+Use Docker Compose 2.24.4 or newer (`!override` support). The approval feature adds an administrator flag, access requests, and email
+delivery tables through Alembic. Existing accounts, documents, and vectors
+remain intact.
 The application and worker retain their existing non-root execution settings.
 
 ## 1. DNS and network
@@ -63,11 +64,11 @@ On a new installation, first follow the base guide's secret setup, then use
 the commands above. Stop if migrations fail. Never use `down -v` or switch
 the project name: those actions can remove or detach persistent data.
 
-The public override **forces `REGISTRATION_ENABLED=false`** for API and worker,
-even if the env file says true. The private/development default remains true.
-Registration is blocked by the API, including direct HTTP requests; hiding
-the frontend link is only a usability feature. `/register` displays an
-invitation message. Login works for existing users and CLI-created reviewers.
+The public override defaults to `REGISTRATION_MODE=closed`. Set it to `approval`
+only after completing the Gmail and administrator setup below. `open` allows
+unrestricted signup and is not the intended public mode. Explicit
+`REGISTRATION_MODE` takes precedence over the legacy `REGISTRATION_ENABLED`
+setting. Development retains its existing open-registration default.
 
 Caddy obtains and renews a trusted certificate automatically. TCP 80/443 must
 be reachable for certificate challenges. HTTP redirects to HTTPS. Certificate
@@ -77,25 +78,83 @@ certificate, ACME account, and configuration state across container recreation.
 Their initial ownership comes from the image (UID/GID 10001). Keep these
 volumes during updates; do not repeatedly delete them to troubleshoot TLS.
 
-## 3. Create reviewer accounts
+## 3. Configure Gmail and your administrator
 
-From an interactive SSH terminal in the repository:
+1. Enable Google 2-Step Verification and generate a dedicated **RAG app**
+   App Password at https://myaccount.google.com/apppasswords. Availability
+   depends on Google account policy; use an App Password, not your main password.
+2. Add `SMTP_USERNAME=tapangarasangi@gmail.com` and `SMTP_PASSWORD` privately to
+   the server's `.env.production`. Do not put credentials in commands, commits,
+   screenshots, or chat. The default transport is `smtp.gmail.com:587` using
+   STARTTLS with certificate verification. Allow outbound TCP 587 if restricted.
+3. Keep `ACCESS_NOTIFICATION_EMAIL=tapangarasangi@gmail.com`. The public
+   override derives `PUBLIC_APP_URL=https://<PUBLIC_HOSTNAME>` for email links;
+   incoming Host headers never choose the links' destination.
+4. Grant your **existing** owner account administrator access:
 
 ```bash
-dc exec api python -m app.cli create-user --email reviewer@example.com
+dc exec api python -m app.cli grant-admin --email tapangarasangi@gmail.com
 ```
 
-Replace the example email. Type and confirm a unique password when prompted;
-input is hidden. Do **not** use `-T`, pass passwords on the command line, or put
-them in environment files. The CLI refuses an echoing input fallback, validates
-email/password, hashes the password, and rejects duplicate email addresses.
-It does not reset existing passwords or send invitations. Share credentials
-privately with the intended reviewer. They sign in at the public URL.
+If the account does not exist, first create it with
+`dc exec api python -m app.cli create-user --email tapangarasangi@gmail.com`.
+Use the hidden password prompt without `-T`. Granting admin does not change
+an existing password. Public requests cannot set administrator privileges.
 
-There is no account administration UI or password-reset flow in this version.
-Inviting someone grants access to uploads and provider-backed questions in
-their own account. Invite-only access limits who can use these operations;
-it is not a rate limiter, per-user quota, or OpenAI spending cap.
+After SMTP authentication succeeds, set `REGISTRATION_MODE=approval` in the
+server env file and run `dc up -d --wait api worker frontend`. Approval-mode
+production startup requires SMTP credentials and an HTTPS public origin.
+Check `/api/auth/config` reports `registration_mode: approval`.
+
+### Daily use
+
+Visitors choose **Request access** and submit their email. You receive a
+notification linking to `/admin/access-requests`. Sign in with your owner
+account, then choose **Approve** or **Reject**. The workspace also contains an
+**Access requests** link for administrators. Opening an email link alone never
+approves a request.
+
+Approval emails the visitor a registration link, valid for seven days, bound
+to their email, and usable once. They choose their own password. **Resend
+invitation** generates a new link and invalidates the previous one. Rejecting
+an approved request revokes its link; it does not delete an existing account.
+Existing users continue logging in normally. Rejected requests do not reopen
+through public resubmission; an administrator can explicitly approve them.
+
+The admin list displays pending, approved, rejected, and registered requests,
+with the five latest email delivery records for each. Refresh to see delivery
+updates. SMTP acceptance is recorded as `sent`; it does not guarantee inbox
+placement, so check spam folders during verification.
+
+### Delivery and recovery
+
+The API commits request/delivery records before queuing an email task. Celery
+sends mail with up to three attempts, 60 seconds apart. Tasks contain only a
+delivery ID. Invitation tokens are derived with a purpose-specific HMAC using
+the JWT secret and a random invitation version; only their hashes are stored
+for validation. Raw tokens and SMTP errors are not logged. Tokens travel in a
+URL fragment and API request bodies, not HTTP access-log query strings.
+
+Email delivery is at least once: an SMTP disconnect after acceptance can cause
+a duplicate email. It never creates another account or changes the invitation.
+Worker/broker failure can leave pending records. The admin page offers **Retry
+email** for failed deliveries and for pending/retrying records older than five
+minutes. Old/revoked invitation jobs are cancelled without sending. Expired
+invitations need **Resend invitation**. Rotating `JWT_SECRET` can prevent unsent
+invitation jobs from reproducing their token; resend those invitations.
+
+Public submissions produce a generic confirmation. Existing accounts and
+approved/rejected requests do not trigger notifications. Redis admits at most
+one owner notification per normalized email in 24 hours and ten new owner
+notifications per fixed hour, across API processes. Delivery retries and explicit
+administrator actions are not new public submissions. A Redis outage returns
+503; the global cap returns 429. There is no IP-based limiter, CAPTCHA, email
+verification before requesting access, or automatic rejection email in v1.
+
+This controls account admission, not per-user OpenAI spending. Approved users
+can still generate provider costs. To pause requests and invitation registration,
+set `REGISTRATION_MODE=closed` and recreate API/worker; existing login continues.
+The server-only `create-user` command remains available for operator recovery.
 
 ## 4. Verify from outside the VM
 
@@ -108,11 +167,13 @@ curl --fail https://tapan-rag.duckdns.org/api/auth/config
 ```
 
 Expect an HTTP→HTTPS redirect, `{"status":"ok"}`, and
-`{"registration_enabled":false}` respectively. Do not use `curl -k`: a trusted
+`{"registration_enabled":false,"registration_mode":"approval"}` respectively. Do not use `curl -k`: a trusted
 certificate is part of this check. In a browser, verify login, refresh on
 `/workspace`, a text upload reaching `ready`, a streamed answer with citations,
-and Stop during generation. Check `/register` shows the invite-only message.
-A valid direct registration request must return 403.
+and Stop during generation. Check an uninvited visit to `/register` links to Request access.
+Registration without an approved invitation must return 403. Verify one real
+request → owner email → approval → invitation email → registration flow, then
+confirm the invitation cannot be reused.
 
 Confirm all services are healthy and inspect relevant logs if a check fails:
 
@@ -141,8 +202,9 @@ contents contain private TLS/account keys and must never enter Git or images.
 
 To return to SSH-only access, use the base `compose.prod.yml` helper and
 `dc up -d --wait --force-recreate frontend`. This removes the public port
-bindings. Keep `REGISTRATION_ENABLED=false` in the env file if you want
-invite-only registration to persist when using the base configuration.
+bindings. Keep `REGISTRATION_ENABLED=false` in the env file when reverting to the base
+configuration to prevent unrestricted signup. The approval-mode setting is
+applied by the public override.
 Close Oracle 80/443 ingress if public access is no longer needed.
 
 If HTTPS fails, check DNS, Oracle ingress, host forwarding, and frontend logs
@@ -152,13 +214,16 @@ files, tokens, uploaded private documents, or unredacted logs publicly.
 
 ## Local verification
 
-- 145 backend tests and 56 frontend tests passed; production build and type
+- 164 backend tests and 66 frontend tests passed; production build and type
   checking passed. Lint reports three existing Fast Refresh warnings.
 - Both production images built on ARM64. An isolated public Compose stack
   passed health checks with a locally trusted test certificate.
 - HTTP redirected to HTTPS; reviewer login, authenticated routes, SPA deep
   links, SSE completion, and registration rejection passed through Caddy.
 - The private Caddy configuration still served the API with the new image.
+- An isolated production stack delivered request and invitation emails through
+  Celery and a STARTTLS SMTP receiver. Browser approval and invitation
+  registration passed, and registration consumed the token.
 - Staged changes were scanned for secrets before each commit. Environment
   files, SSH keys, uploaded data, and TLS private material stay outside Git.
 

@@ -1,11 +1,28 @@
 # API Reference
 
-`GET /auth/config` is unauthenticated and returns only
-`{"registration_enabled": true}` or `false`. When disabled,
-`POST /auth/register` returns **403** for valid registration requests.
-Existing users can still log in. Public HTTPS deployment forces registration
-off; operators create reviewer accounts using the server CLI described in
-[Public deployment](PUBLIC_DEPLOYMENT.md). Production routes have an `/api` prefix.
+`GET /auth/config` returns `registration_mode` (`open`, `approval`, or `closed`)
+and a compatibility `registration_enabled` boolean, true only for `open`.
+In approval mode, `POST /auth/register` requires an `invitation_token` alongside
+email/password. The token is bound to that email, expires after seven days,
+and is consumed atomically with account creation. Closed mode rejects signup.
+`GET /auth/me` and user responses include `is_admin`; clients cannot assign it.
+Production routes have an `/api` prefix.
+
+Access endpoints:
+
+| Method and path | Purpose |
+| --- | --- |
+| `POST /auth/access-requests` | Email-only access request; generic 202; 429 on global notification limit, 503 on Redis outage |
+| `POST /auth/invitations/validate` | Body `{ "token": "..." }`; returns invited email and expiry; invalid/revoked/expired/used tokens return 400 |
+| `GET /admin/access-requests?offset=0&limit=20` | Admin-only paginated requests, including the five latest delivery records per request |
+| `POST /admin/access-requests/{id}/approve` | Admin approves or resends; replaces previous invitation; 409 for an existing account |
+| `POST /admin/access-requests/{id}/reject` | Admin rejects and revokes an unused invitation; 409 if already registered |
+| `POST /admin/access-emails/{id}/retry` | Admin retries failed or stalled delivery; 409 if not retryable |
+
+Administrator routes require the existing Bearer token and a server-assigned
+administrator flag. Notification links are navigation only; decisions require
+an authenticated POST. See [setup and recovery](PUBLIC_DEPLOYMENT.md).
+
 
 All examples assume the stack is running via `docker compose up --build` (see [README.md](../README.md)) and use the default port `8010`. Interactive, always-current docs are also available at **http://localhost:8010/docs** (Swagger UI, auto-generated from the FastAPI app).
 
