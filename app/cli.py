@@ -7,11 +7,14 @@ import warnings
 
 from fastapi import HTTPException
 from pydantic import ValidationError
+from pydantic import EmailStr, TypeAdapter
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth.schemas import UserCreate
 from app.auth.service import register_user
 from app.database import SessionLocal
+from app.models.user import User
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,9 +22,22 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     create = commands.add_parser("create-user", help="Create an account with a hidden password prompt")
     create.add_argument("--email", required=True)
+    grant = commands.add_parser("grant-admin", help="Grant admin access to an existing account")
+    grant.add_argument("--email", required=True)
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "grant-admin":
+            email = str(TypeAdapter(EmailStr).validate_python(args.email)).strip().lower()
+            with SessionLocal() as db:
+                user = db.scalar(select(User).where(User.email == email))
+                if user is None:
+                    print("Account not found. Create it with create-user first.", file=sys.stderr)
+                    return 1
+                user.is_admin = True
+                db.commit()
+                print(f"Administrator access granted: {email}")
+            return 0
         # Refuse getpass's echoing fallback when no terminal is available.
         with warnings.catch_warnings():
             warnings.simplefilter("error", getpass.GetPassWarning)
@@ -38,7 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     except ValidationError as exc:
         # Never render ValidationError itself: it includes submitted inputs.
         for error in exc.errors(include_input=False, include_url=False):
-            print(f"Invalid {error['loc'][0]}: {error['msg']}", file=sys.stderr)
+            field = error['loc'][0] if error['loc'] else 'email'
+            print(f"Invalid {field}: {error['msg']}", file=sys.stderr)
         return 2
     except HTTPException as exc:
         message = "Email already registered." if exc.status_code == 409 else "Account creation failed."

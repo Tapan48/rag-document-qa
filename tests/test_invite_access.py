@@ -15,7 +15,7 @@ def test_public_config_exposes_only_registration_flag(client, monkeypatch, enabl
     monkeypatch.setattr(settings, "registration_enabled", enabled)
     response = client.get("/auth/config")
     assert response.status_code == 200
-    assert response.json() == {"registration_enabled": enabled}
+    assert response.json() == {"registration_enabled": enabled, "registration_mode": "open" if enabled else "closed"}
 
 
 def test_disabled_registration_creates_no_user(client, db_session, monkeypatch):

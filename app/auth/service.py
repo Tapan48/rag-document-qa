@@ -11,7 +11,7 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def register_user(db: Session, email: str, password: str) -> User:
+def register_user(db: Session, email: str, password: str, *, commit: bool = True) -> User:
     normalized_email = _normalize_email(email)
 
     existing = db.execute(
@@ -23,7 +23,9 @@ def register_user(db: Session, email: str, password: str) -> User:
     user = User(email=normalized_email, password_hash=hash_password(password))
     db.add(user)
     try:
-        db.commit()
+        db.flush()
+        if commit:
+            db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")

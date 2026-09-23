@@ -1,3 +1,6 @@
+from typing import Literal
+
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +14,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     registration_enabled: bool = True
+    # Explicit mode takes precedence over the legacy development toggle.
+    registration_mode: Literal["open", "approval", "closed"] | None = None
+    public_app_url: str = "http://localhost:5173"
+    access_notification_email: str = "tapangarasangi@gmail.com"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+
+    @property
+    def effective_registration_mode(self) -> str:
+        return self.registration_mode or ("open" if self.registration_enabled else "closed")
 
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
