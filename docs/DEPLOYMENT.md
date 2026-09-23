@@ -1,5 +1,10 @@
 # Oracle deployment: private access through SSH
 
+For a public URL with automatic HTTPS and invite-only accounts, use
+[Public deployment](PUBLIC_DEPLOYMENT.md) after preparing this base stack.
+The public guide replaces the `dc` helper below with one that includes the
+public override; use that helper for subsequent updates and recovery too.
+
 This setup targets Ubuntu 24.04 on an ARM64 Oracle A1 VM with 2 OCPUs,
 12 GB RAM, and a 50 GB boot volume. Docker Engine, the Compose plugin, Git,
 and SSH access must already work. It also builds on AMD64.
@@ -215,10 +220,9 @@ dc exec -T worker celery -A app.celery_app inspect ping
   Forced termination can leave ingestion stuck: Redis persistence does not
   add job-recovery guarantees to the existing Celery implementation. Delete
   and re-upload a stuck document after investigating the failure.
-- The current JWT/sessionStorage design and lack of public abuse controls
-  remain portfolio limitations. A public launch needs a separate HTTPS,
-  access-control, and usage-limit review. Do not simply change the loopback
-  binding to a public address.
+- The current JWT/sessionStorage design and lack of per-user quotas remain
+  portfolio limitations. Use the [public deployment guide](PUBLIC_DEPLOYMENT.md)
+  for HTTPS and invite-only access; do not simply expose the loopback binding.
 - Image major-version tags can change on rebuild. Record tested image IDs
   with releases and retest before deploying rebuilt images.
 
@@ -244,5 +248,5 @@ and a mock OpenAI HTTP service (no real provider requests):
   no environment files, SSH keys, local assignment PDF, or baked credential
   variables in either application image.
 
-Oracle application deployment and a real-provider smoke test are still pending.
-The existing development stack was kept running during verification.
+This record covers the initial private-stack local verification. See the public
+guide for HTTPS verification. The existing development stack was kept running.

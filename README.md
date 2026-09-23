@@ -66,9 +66,9 @@ Add `-v` to also remove the `pgdata` volume and start clean.
 
 The commands above use the **development** Compose file: source mounts, Uvicorn reload, and Vite's dev server.
 
-For the Oracle server, use the separate [production deployment guide](docs/DEPLOYMENT.md). It builds static React assets served by Caddy, runs non-root application containers, keeps database/Redis/API ports private, and persists data in named volumes. The application is bound to `127.0.0.1:8080` and accessed through an SSH tunnel. Production secrets live in an ignored `.env.production` file; `.env.production.example` contains placeholders only.
+For the Oracle server, use the separate [production deployment guide](docs/DEPLOYMENT.md). It builds static React assets served by Caddy, runs non-root application containers, keeps database/Redis/API ports private, and persists data in named volumes. The base configuration binds to `127.0.0.1:8080` for SSH access. The [public HTTPS guide](docs/PUBLIC_DEPLOYMENT.md) adds automatic TLS and invite-only access. Production secrets live in an ignored `.env.production` file; `.env.production.example` contains placeholders only.
 
-This first deployment is private and has no public HTTPS endpoint. Public access and additional abuse controls are a later step. Local production verification is documented in the guide; the Oracle application deployment remains pending.
+Public deployment requires a hostname pointing to the server and inbound TCP ports 80/443. New accounts are created by the server operator; visitors cannot register. OpenAI usage remains separately billed, and invite-only access does not impose a spending cap.
 
 ## Development commands
 

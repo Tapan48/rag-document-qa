@@ -12,7 +12,11 @@ Production files are separate from development: `compose.prod.yml`, backend/fron
 `Dockerfile.prod`, `frontend/Caddyfile`, and `.env.production.example`.
 Follow `docs/DEPLOYMENT.md` for migration ordering, SSH-tunnel access, and recovery.
 Never print real environment files or stage SSH keys, backups, or the local assignment PDF.
-Production is localhost-only; do not publish it publicly without a separate deployment decision.
+The base production stack is localhost-only. Authorized public deployments add
+`compose.public.yml` and `frontend/Caddyfile.public`; see `docs/PUBLIC_DEPLOYMENT.md`.
+The public override forces registration off. Reviewer accounts use
+`python -m app.cli create-user --email EMAIL` with a hidden terminal password prompt.
+Keep the same Compose project name to preserve database, upload, and TLS volumes.
 
 ```bash
 cp .env.example .env                                    # one-time setup

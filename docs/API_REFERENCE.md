@@ -1,5 +1,12 @@
 # API Reference
 
+`GET /auth/config` is unauthenticated and returns only
+`{"registration_enabled": true}` or `false`. When disabled,
+`POST /auth/register` returns **403** for valid registration requests.
+Existing users can still log in. Public HTTPS deployment forces registration
+off; operators create reviewer accounts using the server CLI described in
+[Public deployment](PUBLIC_DEPLOYMENT.md). Production routes have an `/api` prefix.
+
 All examples assume the stack is running via `docker compose up --build` (see [README.md](../README.md)) and use the default port `8010`. Interactive, always-current docs are also available at **http://localhost:8010/docs** (Swagger UI, auto-generated from the FastAPI app).
 
 ## Authentication
