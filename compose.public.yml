@@ -1,0 +1,25 @@
+# Public HTTPS: always combine with compose.prod.yml and the same project name.
+# Requires Docker Compose 2.24.4+ for !override.
+services:
+  api:
+    environment:
+      REGISTRATION_ENABLED: "false"
+  worker:
+    environment:
+      REGISTRATION_ENABLED: "false"
+  frontend:
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.public", "--adapter", "caddyfile"]
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?Set PUBLIC_HOSTNAME to your DNS hostname}
+    ports: !override
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/health"]
+
+volumes:
+  caddy_data:
+  caddy_config:
