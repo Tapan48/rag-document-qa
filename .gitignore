@@ -12,6 +12,7 @@ venv/
 id_rsa*
 id_ed25519*
 /project_assignment.pdf
+/backups/
 *.egg-info/
 .pytest_cache/
 uploads/

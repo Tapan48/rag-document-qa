@@ -1,0 +1,147 @@
+name: rag-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-database-env: &database-env
+  POSTGRES_USER: rag
+  POSTGRES_DB: rag
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+
+x-app-env: &app-env
+  <<: *database-env
+  # Also available to `compose exec` commands, which bypass the entrypoint.
+  DATABASE_URL: postgresql+psycopg://rag:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@db:5432/rag
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
+  JWT_ALGORITHM: HS256
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env.production}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+  EMBEDDING_DIMENSIONS: "1536"
+  CHAT_MODEL: ${CHAT_MODEL:-gpt-5.6-luna}
+  REASONING_EFFORT: ${REASONING_EFFORT:-none}
+  RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-5}
+  MAX_OUTPUT_TOKENS: ${MAX_OUTPUT_TOKENS:-1000}
+  UPLOAD_DIR: /data/uploads
+  MAX_UPLOAD_MB: "20"
+  CHUNK_SIZE_TOKENS: "500"
+  CHUNK_OVERLAP_TOKENS: "100"
+
+x-backend: &backend
+  image: rag-backend:production
+  build:
+    context: .
+    dockerfile: Dockerfile.prod
+  init: true
+  logging: *logging
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment: *database-env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    profiles: [tools]
+    restart: "no"
+    environment: *database-env
+    command: alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    restart: unless-stopped
+    environment: *app-env
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    stop_grace_period: 75s
+
+  worker:
+    <<: *backend
+    restart: unless-stopped
+    environment: *app-env
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping --destination celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 120s
+
+  frontend:
+    image: rag-frontend:production
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
