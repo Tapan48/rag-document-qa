@@ -64,7 +64,11 @@ Add `-v` to also remove the `pgdata` volume and start clean.
 
 ## Local development vs. production
 
-Everything above describes **local development only**: `uvicorn --reload` with bind-mounted source, Vite's dev server (not a production build), non-default host ports chosen to avoid local port conflicts, and JWTs in `sessionStorage`. None of this is a production deployment — there's no HTTPS termination, no production-grade process manager, no built/minified frontend bundle served from a CDN or static host, and no secrets management beyond a local `.env` file. Standing this up in production would additionally need, at minimum: `vite build` served behind a real web server, a managed Postgres instance, secrets pulled from a vault rather than a file, and the API run behind HTTPS with the backend not directly exposed to the internet.
+The commands above use the **development** Compose file: source mounts, Uvicorn reload, and Vite's dev server.
+
+For the Oracle server, use the separate [production deployment guide](docs/DEPLOYMENT.md). It builds static React assets served by Caddy, runs non-root application containers, keeps database/Redis/API ports private, and persists data in named volumes. The application is bound to `127.0.0.1:8080` and accessed through an SSH tunnel. Production secrets live in an ignored `.env.production` file; `.env.production.example` contains placeholders only.
+
+This first deployment is private and has no public HTTPS endpoint. Public access and additional abuse controls are a later step. Local production verification is documented in the guide; the Oracle application deployment remains pending.
 
 ## Development commands
 

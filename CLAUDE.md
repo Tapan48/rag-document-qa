@@ -8,6 +8,12 @@ All 7 parts (Foundation, Authentication and Ownership, Document Ingestion, Retri
 
 ## Commands
 
+Production files are separate from development: `compose.prod.yml`, backend/frontend
+`Dockerfile.prod`, `frontend/Caddyfile`, and `.env.production.example`.
+Follow `docs/DEPLOYMENT.md` for migration ordering, SSH-tunnel access, and recovery.
+Never print real environment files or stage SSH keys, backups, or the local assignment PDF.
+Production is localhost-only; do not publish it publicly without a separate deployment decision.
+
 ```bash
 cp .env.example .env                                    # one-time setup
 docker compose up --build                                # start db, redis, api, worker, frontend

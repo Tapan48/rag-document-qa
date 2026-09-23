@@ -16,7 +16,7 @@ flowchart TB
 
     OpenAI["OpenAI API<br/>(embeddings + chat)"]
 
-    Browser -->|"HTTPS, port 5173"| Frontend
+    Browser -->|"HTTP, port 5173"| Frontend
     Frontend -->|"/api/* proxy,<br/>strips prefix"| API
     API -->|"SQLAlchemy"| DB
     API -->|"enqueue ingestion job"| Redis
@@ -26,7 +26,9 @@ flowchart TB
     API -->|"embed question,<br/>generate answer"| OpenAI
 ```
 
-The browser never talks to the `api` container directly, never sees its port, and never holds an API key — every request from the SPA goes through the Vite dev server's `/api` proxy, which forwards to FastAPI and strips the prefix (`vite.config.ts`). This is a development convenience (real cross-origin/CORS setup and a production build are out of scope here — see [README.md's Production note](../README.md#local-development-vs-production)).
+The browser never talks to the `api` container directly, never sees its port, and never holds an OpenAI API key. In development, the Vite proxy strips `/api` before forwarding requests to FastAPI.
+
+In the [production setup](DEPLOYMENT.md), a Caddy container serves the compiled SPA and performs the same proxying. An SSH tunnel connects the browser to the server's loopback port 8080; database, Redis, and API ports remain unpublished. Production uses named volumes for PostgreSQL, Redis AOF, and shared uploads. A separate one-off service runs migrations before application startup.
 
 ## Two independent flows
 
