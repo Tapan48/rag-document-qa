@@ -117,6 +117,8 @@ Defaults, configurable through environment variables:
 
 Research has no background jobs or persistence. Stop/disconnect cancels the active research or generation operation and closes its provider connection. Upstream work already performed may still be billed. These per-request limits are not an account spending cap.
 
+When web mode includes documents, its preparatory question-embedding call has a 20-second provider timeout and no automatic retry. Provider failure returns 503 before the SSE stream opens. The research deadline begins after retrieval; it is not a total request deadline.
+
 ## Questions (streaming)
 
 ```bash

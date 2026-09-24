@@ -20,15 +20,20 @@ class EmbeddingTransientError(Exception):
     """Transient embedding failure worth retrying (timeouts, rate limits, connection errors)."""
 
 
-def embed_texts(texts: list[str], batch_size: int = 100) -> list[list[float]]:
+def embed_texts(
+    texts: list[str], batch_size: int = 100, *, timeout_seconds: float | None = None
+) -> list[list[float]]:
     if not texts:
         return []
 
+    client = _client if timeout_seconds is None else _client.with_options(
+        timeout=timeout_seconds, max_retries=0
+    )
     vectors: list[list[float]] = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
         try:
-            response = _client.embeddings.create(model=settings.embedding_model, input=batch)
+            response = client.embeddings.create(model=settings.embedding_model, input=batch)
         except _TRANSIENT_OPENAI_ERRORS as exc:
             raise EmbeddingTransientError(str(exc)) from exc
         except openai.OpenAIError as exc:

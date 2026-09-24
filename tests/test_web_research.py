@@ -162,6 +162,24 @@ def test_web_ownership_and_readiness_before_search(client,monkeypatch,db_session
     search.assert_not_awaited()
 
 
+def test_web_embedding_failure_is_bounded_and_prevents_search(client, monkeypatch, db_session):
+    from app.ingestion.embeddings import EmbeddingTransientError
+
+    search = stub_research_and_answer(monkeypatch)
+    headers = _auth_headers(client, REGISTER_A)
+    _create_ready_document_with_chunk(db_session, REGISTER_A['email'])
+
+    def timeout(texts, *, timeout_seconds):
+        assert timeout_seconds == 20
+        raise EmbeddingTransientError('timeout')
+
+    monkeypatch.setattr(pipeline, 'embed_texts', timeout)
+    response = client.post('/questions/stream', headers=headers, json={'question': 'q', 'web_search': True})
+    assert response.status_code == 503
+    assert response.json()['detail'] == 'Embedding provider unavailable'
+    search.assert_not_awaited()
+
+
 @pytest.mark.parametrize('endpoint',['/questions','/questions/stream'])
 def test_toggle_off_never_searches(client,monkeypatch,endpoint):
     search=AsyncMock(side_effect=AssertionError('Must not search'))

@@ -49,7 +49,10 @@ def prepare_question(
         return PreparedQuestion(question=question, retrieved=[], web_search=True)
 
     try:
-        question_embedding = embed_texts([question])[0]
+        # Web research has its own deadline after retrieval. Bound preparation
+        # too, without changing the ingestion worker's batching/retry behavior.
+        options = {"timeout_seconds": 20.0} if web_search else {}
+        question_embedding = embed_texts([question], **options)[0]
     except EmbeddingTransientError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Embedding provider unavailable")
     except EmbeddingError:

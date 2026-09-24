@@ -54,6 +54,18 @@ def test_embed_texts_batches_requests(monkeypatch):
     assert [len(call) for call in fake_client.embeddings.calls] == [100, 100, 50]
 
 
+def test_optional_question_timeout_disables_sdk_retries(monkeypatch):
+    from unittest.mock import Mock
+
+    scoped = _FakeClient(_fake_response())
+    client = Mock()
+    client.with_options.return_value = scoped
+    monkeypatch.setattr(embeddings, "_client", client)
+    assert len(embed_texts(["question"], timeout_seconds=20)) == 1
+    client.with_options.assert_called_once_with(timeout=20, max_retries=0)
+    assert scoped.embeddings.calls == [["question"]]
+
+
 def test_embed_texts_raises_on_dimension_mismatch(monkeypatch):
     fake_client = _FakeClient(_fake_response(dim=42))
     monkeypatch.setattr(embeddings, "_client", fake_client)
