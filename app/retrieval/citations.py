@@ -19,6 +19,7 @@ def resolve_citations(
         seen_labels.add(label)
         citations.append(
             CitationOut(
+                source_id=label,
                 chunk_id=chunk.chunk_id,
                 document_id=chunk.document_id,
                 filename=chunk.filename,

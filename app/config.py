@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     reasoning_effort: str = "none"
     retrieval_top_k: int = 5
     max_output_tokens: int = 1000
+    web_search_model: str = "gpt-5.6-luna"
+    web_search_max_tool_calls: int = Field(default=3, ge=1, le=10)
+    web_search_timeout_seconds: float = Field(default=90.0, gt=0, le=300)
+    answer_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
+    web_search_max_output_tokens: int = Field(default=3000, ge=500, le=10000)
 
 
 settings = Settings()

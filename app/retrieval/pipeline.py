@@ -1,16 +1,19 @@
 import uuid
+import re
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.documents.queries import get_owned_document
 from app.ingestion.embeddings import EmbeddingError, EmbeddingTransientError, embed_texts
-from app.models.document import DocumentStatus
+from app.models.document import Document, DocumentStatus
 from app.retrieval.citations import resolve_citations
 from app.retrieval.generation import GeneratedAnswer, GenerationError
 from app.retrieval.queries import RetrievedChunk, retrieve_chunks
 from app.retrieval.schemas import QuestionResponse
+from app.retrieval.research import ResearchResult
 
 FALLBACK_ANSWER = "No processed documents were found to answer this question."
 
@@ -19,6 +22,7 @@ FALLBACK_ANSWER = "No processed documents were found to answer this question."
 class PreparedQuestion:
     question: str
     retrieved: list[RetrievedChunk]
+    web_search: bool = False
 
 
 def prepare_question(
@@ -26,6 +30,7 @@ def prepare_question(
     owner_id: uuid.UUID,
     question: str,
     document_ids: list[uuid.UUID] | None,
+    web_search: bool = False,
 ) -> PreparedQuestion:
     """Validate ownership/readiness and retrieve chunks. Raises HTTPException
     for any failure here, since this always runs before any provider call or
@@ -38,6 +43,11 @@ def prepare_question(
                     status.HTTP_409_CONFLICT, f"Document {document_id} is not ready"
                 )
 
+    if web_search and db.scalar(select(Document.id).where(
+        Document.owner_id == owner_id, Document.status == DocumentStatus.READY
+    ).limit(1)) is None:
+        return PreparedQuestion(question=question, retrieved=[], web_search=True)
+
     try:
         question_embedding = embed_texts([question])[0]
     except EmbeddingTransientError:
@@ -46,7 +56,7 @@ def prepare_question(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not process question")
 
     retrieved = retrieve_chunks(db, owner_id, question_embedding, document_ids)
-    return PreparedQuestion(question=question, retrieved=retrieved)
+    return PreparedQuestion(question=question, retrieved=retrieved, web_search=web_search)
 
 
 def fallback_response() -> QuestionResponse:
@@ -54,21 +64,28 @@ def fallback_response() -> QuestionResponse:
 
 
 def finalize_answer(
-    generated: GeneratedAnswer, retrieved: list[RetrievedChunk]
+    generated: GeneratedAnswer, retrieved: list[RetrievedChunk], research: ResearchResult | None = None
 ) -> QuestionResponse:
-    """Resolve citations and enforce answer/citation consistency: a
-    substantive answer must have at least one citation, and an
-    insufficient-evidence answer must have none. Raises GenerationError
-    (transport-agnostic) on any inconsistency, left for the caller to map to
-    an HTTP error or an SSE error event."""
-    citations = resolve_citations(generated.cited_labels, retrieved)
+    web_sources = {s.source_id: s for s in research.sources} if research is not None else {}
+    document_labels = []
+    web_citations = []
+    for label in dict.fromkeys(generated.cited_labels):
+        if label in web_sources:
+            web_citations.append(web_sources[label])
+        else:
+            document_labels.append(label)  # resolve_citations rejects unknown S/W labels
+    citations = resolve_citations(document_labels, retrieved)
+    if research is not None:
+        inline = set(re.findall(r"\[([SW]\d+)\]", generated.answer))
+        if inline != set(generated.cited_labels):
+            raise GenerationError("Inline citations do not match cited sources")
     if generated.insufficient_evidence:
-        if citations:
+        if citations or web_citations:
             raise GenerationError("Insufficient-evidence answer must not include citations")
-    elif not citations:
+    elif not citations and not web_citations:
         raise GenerationError("Substantive answer must include at least one citation")
     return QuestionResponse(
-        answer=generated.answer,
-        citations=citations,
+        answer=generated.answer, citations=citations, web_citations=web_citations,
         insufficient_evidence=generated.insufficient_evidence,
+        web_search_performed=research is not None,
     )

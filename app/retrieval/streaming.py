@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _async_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
 
 INACTIVITY_TIMEOUT_SECONDS = 20.0
-TOTAL_DEADLINE_SECONDS = 60.0
+TOTAL_DEADLINE_SECONDS = settings.answer_timeout_seconds
 
 _ANSWER_KEY_PATTERN = '"answer"'
 _VALUE_START_RE = re.compile(r'\s*:\s*"')
@@ -47,7 +47,7 @@ class AnswerDelta:
 StreamOutcome = Union[GeneratedAnswer, GenerationTimeoutError, GenerationUnavailableError, GenerationError]
 
 
-async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Union[AnswerDelta, StreamOutcome]]:
+async def stream_answer(question: str, labeled_context: str, *, web_context: str | None = None) -> AsyncIterator[Union[AnswerDelta, StreamOutcome]]:
     """Yields AnswerDelta for each newly-decoded fragment of the answer text
     as it streams in, followed by exactly one terminal value: a
     GeneratedAnswer on success, or a Generation*Error instance describing
@@ -56,7 +56,8 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
     try/except around iteration itself.
     """
     extractor = _AnswerFieldExtractor()
-    client = _async_client.with_options(max_retries=0)
+    owns_client = web_context is not None
+    client = openai.AsyncOpenAI(api_key=settings.openai_api_key, max_retries=0) if owns_client else _async_client.with_options(max_retries=0)
     stream = None
     final_text: str | None = None
 
@@ -64,9 +65,9 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
         async with asyncio.timeout(TOTAL_DEADLINE_SECONDS):
             stream = await client.responses.create(
                 model=settings.chat_model,
-                input=build_messages(question, labeled_context),
+                input=build_messages(question, labeled_context, web_context),
                 reasoning={"effort": settings.reasoning_effort},
-                max_output_tokens=settings.max_output_tokens,
+                max_output_tokens=max(settings.max_output_tokens, 2500) if web_context is not None else settings.max_output_tokens,
                 text=response_format(),
                 stream=True,
             )
@@ -107,6 +108,8 @@ async def stream_answer(question: str, labeled_context: str) -> AsyncIterator[Un
     finally:
         if stream is not None:
             await stream.close()
+        if owns_client:
+            await client.close()
 
     if final_text is None:
         logger.warning("streaming answer generation produced no output")

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 class QuestionRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     document_ids: list[uuid.UUID] | None = None
+    web_search: bool = False
 
     @field_validator("question")
     @classmethod
@@ -25,6 +27,7 @@ class QuestionRequest(BaseModel):
 
 
 class CitationOut(BaseModel):
+    source_id: str | None = None
     chunk_id: uuid.UUID
     document_id: uuid.UUID
     filename: str
@@ -32,7 +35,16 @@ class CitationOut(BaseModel):
     text: str
 
 
+class WebCitationOut(BaseModel):
+    source_id: str
+    title: str
+    url: str
+    researched_at: datetime
+
+
 class QuestionResponse(BaseModel):
     answer: str
     citations: list[CitationOut]
     insufficient_evidence: bool
+    web_citations: list[WebCitationOut] = Field(default_factory=list)
+    web_search_performed: bool = False

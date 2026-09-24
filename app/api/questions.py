@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -14,18 +17,32 @@ from app.retrieval.generation import (
 )
 from app.retrieval.pipeline import fallback_response, finalize_answer, prepare_question
 from app.retrieval.schemas import QuestionRequest, QuestionResponse
-from app.retrieval.sse import SSE_HEADERS, generate_question_stream_events
+from app.retrieval.sse import SSE_HEADERS, generate_question_stream_events, collect_web_answer
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
 
 @router.post("", response_model=QuestionResponse)
-def ask_question(
+async def ask_question(
     payload: QuestionRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> QuestionResponse:
-    prepared = prepare_question(db, current_user.id, payload.question, payload.document_ids)
+    prepared = await run_in_threadpool(prepare_question, db, current_user.id, payload.question, payload.document_ids, payload.web_search)
+
+    if prepared.web_search:
+        task = asyncio.create_task(collect_web_answer(prepared))
+        try:
+            while not task.done():
+                await asyncio.wait({task}, timeout=0.5)
+                if await request.is_disconnected():
+                    raise HTTPException(499, "Client disconnected")
+            return task.result()
+        finally:
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
     if not prepared.retrieved:
         return fallback_response()
@@ -33,7 +50,7 @@ def ask_question(
     labeled_context = build_labeled_context(prepared.retrieved)
 
     try:
-        generated = generate_answer(prepared.question, labeled_context)
+        generated = await run_in_threadpool(generate_answer, prepared.question, labeled_context)
     except GenerationTimeoutError:
         raise HTTPException(status.HTTP_504_GATEWAY_TIMEOUT, "Answer generation timed out")
     except GenerationUnavailableError:
@@ -59,7 +76,7 @@ def ask_question_stream(
     # this plain `def` route -- FastAPI executes it in a worker thread, and
     # the `db` session is fully used and about to be torn down before the
     # async generator below (which never touches `db`) starts streaming.
-    prepared = prepare_question(db, current_user.id, payload.question, payload.document_ids)
+    prepared = prepare_question(db, current_user.id, payload.question, payload.document_ids, payload.web_search)
 
     return StreamingResponse(
         generate_question_stream_events(prepared),
