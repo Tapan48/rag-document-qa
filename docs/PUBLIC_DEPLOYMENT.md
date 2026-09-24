@@ -230,3 +230,9 @@ files, tokens, uploaded private documents, or unredacted logs publicly.
 Local checks use a temporary CA and mocked provider calls. They do not prove
 public certificate issuance, Oracle ingress, or real provider access; verify
 those on the live server using the steps above.
+
+## Optional web-search configuration
+
+The production Compose configuration passes `WEB_SEARCH_MODEL` (default `gpt-5.6-luna`), `WEB_SEARCH_MAX_TOOL_CALLS` (3), `WEB_SEARCH_TIMEOUT_SECONDS` (90), `WEB_SEARCH_MAX_OUTPUT_TOKENS` (3000), and `ANSWER_TIMEOUT_SECONDS` (60). The existing `OPENAI_API_KEY` is used; no new provider credentials or migrations are required. Set overrides in the ignored `.env.production` and recreate the API container to apply them. Rebuild API and frontend images when updating code.
+
+Web mode starts off for each workspace session. Enabling it adds paid research calls before answer generation; invitation controls and per-request limits do not impose a total spending cap. Research is synchronous to the request and can be stopped. Results reflect cited pages at the research time, not guaranteed current stock or compatibility.

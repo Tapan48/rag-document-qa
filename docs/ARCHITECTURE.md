@@ -97,6 +97,12 @@ sequenceDiagram
 
 **Insufficient evidence**: an unrelated question, or one with no `ready` documents at all, returns `insufficient_evidence: true` with no citations rather than a fabricated answer — verified with real questions in [EVALUATION.md](EVALUATION.md).
 
+## Optional web research
+
+With `web_search=true`, validated retrieval is followed by a request-scoped async research step (`research.py`). A model derives a short public search brief from the question and retrieved passages. A second response is required to invoke web search, bounded by tool-call and time limits. Only findings with actual provider URL annotations are retained and assigned `W` IDs. Final generation combines this evidence with the existing `S` passages, then validates inline IDs against returned citations. No database schema changes are involved.
+
+Both endpoints share research, synthesis, and validation. SSE progress exposes searching/generating phases; disconnect and Stop close the active provider connection. Failed searches cannot become successful document-only responses. The frontend renders safe Markdown with HTML disabled, suppresses images, and permits outbound links only to validated HTTP(S) web sources. Tables scroll within the answer panel on narrow screens.
+
 ## Further reading
 
 - [API_REFERENCE.md](API_REFERENCE.md) — every endpoint, request/response shape, and error code

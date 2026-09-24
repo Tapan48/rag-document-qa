@@ -1,12 +1,18 @@
 # RAG Document Q&A
 
-A full-stack Retrieval-Augmented Generation app: register, upload PDF/DOCX/TXT documents, and ask questions that are answered strictly from your own uploaded content — with streamed answers and citations back to the exact source passage.
+A full-stack Retrieval-Augmented Generation app: register, upload PDF/DOCX/TXT documents, and ask questions that are answered from your own uploaded content by default — with streamed answers and citations back to the exact source passage. Enable **Web search** to combine documents with current web findings, or research without documents.
 
 **Features:** email/password authentication with JWT sessions · document upload with status tracking (`queued` → `processing` → `ready`/`failed`) · owner-scoped retrieval (your documents are never visible to anyone else) · streamed, cited answers over Server-Sent Events · an explicit "I don't know" response when a question isn't covered by your documents, instead of a fabricated one · a React workspace with a document sidebar, live streaming Q&A, and a citation detail panel.
 
 **Stack:** Python, FastAPI, PostgreSQL + pgvector, SQLAlchemy, Alembic, Celery, Redis, OpenAI, React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Docker Compose.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit together, [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) for every endpoint, [`docs/DEMO.md`](docs/DEMO.md) for a verified screenshot walkthrough, and [`docs/EVALUATION.md`](docs/EVALUATION.md) for real Q&A results and known limitations. `plan/` has the part-by-part build history.
+
+## Optional web research
+
+The Web search toggle starts off. When enabled, the app performs a real, bounded search using the existing OpenAI key, then streams an answer with separate document and web sources. Comparison tables support horizontal scrolling on small screens. Stop cancels research or generation; Retry preserves the originally submitted mode. Selected-document mode still requires a selection.
+
+Web research adds API charges. Defaults: `WEB_SEARCH_MODEL=gpt-5.6-luna`, up to three web-tool calls, 90 seconds for research, and 60 seconds for answer generation. No database migration or background research worker is needed. See [API details and limits](docs/API_REFERENCE.md#optional-web-research).
 
 ## Prerequisites
 

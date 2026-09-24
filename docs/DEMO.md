@@ -89,3 +89,13 @@ Verified with an automated keyboard-only pass (no mouse), confirming every item 
 | Streaming answer never completes, no `error` shown | Client network interruption without a clean disconnect | Retry — the frontend discards provisional text and offers a Retry button on any stream failure |
 | `insufficient_evidence: true` unexpectedly | No `ready` documents in scope, or the question truly isn't covered | Confirm document status is `ready`, and that the right selection mode/documents are chosen |
 | Frontend can't reach the API | `frontend` container's `VITE_API_PROXY_TARGET` misconfigured | `curl http://localhost:5173/api/health` should return `{"status":"ok"}` |
+
+## Web comparison demonstration
+
+1. Upload a disposable TXT containing: “Arduino Nano (classic) uses ATmega328P, operates at 5V, and has 2KB SRAM. No prices or stock availability are listed.” Wait for Ready.
+2. Enable **Web search** and ask: “Compare this classic Arduino Nano with Arduino Nano Every using official manufacturer sources. Make a table for processor, operating voltage, and SRAM. State unknown prices or availability. Cite document and web sources.”
+3. Observe **Searching the web…**, then **Generating answer…**. Confirm the table, inline document/web markers, document passage panel, and separately linked web sources with research timestamps.
+4. On a phone, scroll the table horizontally within the answer panel. Use Stop during another request; Retry after a failure retains that request's original mode.
+5. Delete the disposable document. With all-ready mode selected, web research also works with no documents. Turning Web search off returns to document-only answers.
+
+A real local comparison was verified on 2026-09-24 using only this public sample: it returned an S1 document citation and two official Arduino web sources, with readable desktop/mobile results. Prices and source ordering are not stable test expectations.
