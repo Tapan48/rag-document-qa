@@ -77,6 +77,26 @@ def test_document_only_groups_are_normalized_without_requiring_inline_markers():
     assert legacy.answer == 'Evidence.'
 
 
+def test_partial_comparison_with_unknown_stock_remains_a_cited_answer():
+    response = finalize_answer(GeneratedAnswer(
+        'The sample claims 6 kg [S1]; the manufacturer lists 7 kg [W1]. '
+        'Current stock could not be confirmed for either machine.',
+        ['S1', 'W1'], False,
+    ), [_chunk()], research_result())
+    assert not response.insufficient_evidence
+    assert response.citations[0].source_id == 'S1'
+    assert response.web_citations[0].source_id == 'W1'
+    assert 'could not be confirmed' in response.answer
+
+
+def test_entirely_unsupported_question_has_no_citations():
+    response = finalize_answer(GeneratedAnswer(
+        'The supplied evidence does not answer this question.', [], True,
+    ), [], ResearchResult('', []))
+    assert response.insufficient_evidence
+    assert not response.citations and not response.web_citations
+
+
 @pytest.mark.parametrize('endpoint', ['/questions', '/questions/stream'])
 @pytest.mark.parametrize('valid', [True, False])
 def test_both_endpoints_normalize_or_return_clear_citation_errors(client, monkeypatch, endpoint, valid):

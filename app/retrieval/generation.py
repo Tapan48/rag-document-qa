@@ -69,10 +69,20 @@ _WEB_SYSTEM_PROMPT = (
     "For multiple sources, prefer separate markers such as [S1] [W1]. "
     "Never invent sources or URLs. Do not write Markdown links; use only the citation markers. "
     "State missing prices/specifications explicitly. Listed prices do not establish stock availability. "
+    "A product listing, Add to cart button, or purchase flow alone does not verify stock either; "
+    "require explicit stock evidence and preserve any location/date limitations, otherwise say unverified. "
     "Do not infer compatibility without supporting specifications. Do not assume a market or currency "
     "the user did not specify. If no useful web findings exist, say so, even if the documents help. "
-    "If the combined evidence cannot answer, set insufficient_evidence=true and cited_labels=[] "
-    "with no inline citations. Otherwise insufficient_evidence=false."
+    "Choose one internally consistent response mode: "
+    "(1) If any useful part of the question can be answered from the evidence, give that supported "
+    "answer with citations, explicitly identify remaining gaps, and set insufficient_evidence=false. "
+    "A partial comparison is an answer: missing prices, model details, or confirmation of current "
+    "stock do NOT make the whole response insufficient. For example, a cited specification table "
+    "with unknown availability must use insufficient_evidence=false and nonempty cited_labels. "
+    "(2) Only when no useful supported answer can be given, return a brief explanation with "
+    "insufficient_evidence=true, cited_labels=[], and no inline citations or factual comparison. "
+    "Never combine insufficient_evidence=true with a cited answer. Before returning, verify "
+    "that cited_labels exactly matches the inline markers and that the flag agrees with this mode."
 )
 
 
