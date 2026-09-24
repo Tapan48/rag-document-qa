@@ -7,11 +7,12 @@ export type StreamPhase = 'idle' | 'streaming' | 'done' | 'error'
 
 export interface UseQuestionStreamResult {
   phase: StreamPhase
+  statusMessage: string
   question: string | null
   provisionalAnswer: string
   finalResponse: QuestionResponse | null
   errorMessage: string | null
-  ask: (question: string, documentIds: string[] | null) => void
+  ask: (question: string, documentIds: string[] | null, webSearch?: boolean) => void
   stop: () => void
   retry: () => void
 }
@@ -28,32 +29,39 @@ export function useQuestionStream(
   onUnauthorized: () => void,
 ): UseQuestionStreamResult {
   const [phase, setPhase] = useState<StreamPhase>('idle')
+  const [statusMessage, setStatusMessage] = useState('Generating answer…')
   const [question, setQuestion] = useState<string | null>(null)
   const [provisionalAnswer, setProvisionalAnswer] = useState('')
   const [finalResponse, setFinalResponse] = useState<QuestionResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const lastRequestRef = useRef<{ question: string; documentIds: string[] | null } | null>(null)
+  const lastRequestRef = useRef<{ question: string; documentIds: string[] | null; webSearch: boolean } | null>(null)
 
   const runStream = useCallback(
-    (questionText: string, documentIds: string[] | null) => {
+    (questionText: string, documentIds: string[] | null, webSearch = false) => {
       if (!token) return
       abortRef.current?.abort()
       const controller = new AbortController()
       abortRef.current = controller
-      lastRequestRef.current = { question: questionText, documentIds }
+      lastRequestRef.current = { question: questionText, documentIds: documentIds ? [...documentIds] : null, webSearch }
 
       setQuestion(questionText)
       setProvisionalAnswer('')
       setFinalResponse(null)
       setErrorMessage(null)
       setPhase('streaming')
+      setStatusMessage(webSearch ? 'Searching the web…' : 'Generating answer…')
 
       void streamQuestion(
         token,
-        { question: questionText, document_ids: documentIds },
+        { question: questionText, document_ids: documentIds, web_search: webSearch },
         {
+          onStatus: (status) => {
+            if (controller.signal.aborted || abortRef.current !== controller) return
+            setStatusMessage(status === 'searching' ? 'Searching the web…' : 'Generating answer…')
+          },
           onAnswerDelta: (delta) => {
+            if (controller.signal.aborted || abortRef.current !== controller) return
             setProvisionalAnswer((prev) => prev + delta)
           },
           onCitations: () => {
@@ -62,12 +70,14 @@ export function useQuestionStream(
             // this UI doesn't need since `done` typically follows immediately.
           },
           onDone: (response) => {
+            if (controller.signal.aborted || abortRef.current !== controller) return
             setFinalResponse(response)
             setProvisionalAnswer('')
             setPhase('done')
             abortRef.current = null
           },
           onError: (code, message) => {
+            if (controller.signal.aborted || abortRef.current !== controller) return
             if (code === 'unauthorized') {
               onUnauthorized()
               return
@@ -85,15 +95,15 @@ export function useQuestionStream(
   )
 
   const ask = useCallback(
-    (questionText: string, documentIds: string[] | null) => {
-      runStream(questionText, documentIds)
+    (questionText: string, documentIds: string[] | null, webSearch = false) => {
+      runStream(questionText, documentIds, webSearch)
     },
     [runStream],
   )
 
   const retry = useCallback(() => {
     if (!lastRequestRef.current) return
-    runStream(lastRequestRef.current.question, lastRequestRef.current.documentIds)
+    runStream(lastRequestRef.current.question, lastRequestRef.current.documentIds, lastRequestRef.current.webSearch)
   }, [runStream])
 
   // Cancel any in-flight stream if the owning component unmounts -- this is
@@ -110,8 +120,9 @@ export function useQuestionStream(
     abortRef.current?.abort()
     abortRef.current = null
     setPhase('idle')
+    setQuestion(null)
     setProvisionalAnswer('')
   }, [])
 
-  return { phase, question, provisionalAnswer, finalResponse, errorMessage, ask, stop, retry }
+  return { phase, statusMessage, question, provisionalAnswer, finalResponse, errorMessage, ask, stop, retry }
 }

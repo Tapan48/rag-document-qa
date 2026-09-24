@@ -15,6 +15,7 @@ import type { SelectionMode } from '@/types/workspace'
 
 export function WorkspacePage() {
   const { user, token, logout } = useAuth()
+  const [webSearch, setWebSearch] = useState(false)
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [activeCitation, setActiveCitation] = useState<CitationOut | null>(null)
@@ -52,7 +53,7 @@ export function WorkspacePage() {
       : null
 
   function handleAsk(question: string) {
-    stream.ask(question, documentIdsForQuestion)
+    stream.ask(question, documentIdsForQuestion, webSearch)
   }
 
   const sidebar = (
@@ -99,9 +100,11 @@ export function WorkspacePage() {
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 overflow-hidden p-4">
+        <main className="min-w-0 flex-1 overflow-hidden p-4">
           <QuestionPanel
             stream={stream}
+            webSearch={webSearch}
+            onWebSearchChange={setWebSearch}
             canAsk={canAsk}
             disabledReason={disabledReason}
             onAsk={handleAsk}

@@ -11,7 +11,7 @@ export function CitationList({ citations, onSelect }: CitationListProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Sources</p>
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Document sources</p>
       <div className="flex flex-wrap gap-2">
         {citations.map((citation, index) => (
           <Button
@@ -20,7 +20,7 @@ export function CitationList({ citations, onSelect }: CitationListProps) {
             size="sm"
             onClick={() => onSelect(citation)}
           >
-            [S{index + 1}] {citation.filename}
+            [{citation.source_id ?? `S${index + 1}`}] {citation.filename}
           </Button>
         ))}
       </div>

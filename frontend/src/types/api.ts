@@ -47,6 +47,7 @@ export interface DocumentList {
 }
 
 export interface CitationOut {
+  source_id?: string | null
   chunk_id: string
   document_id: string
   filename: string
@@ -54,13 +55,23 @@ export interface CitationOut {
   text: string
 }
 
+export interface WebCitationOut {
+  source_id: string
+  title: string
+  url: string
+  researched_at: string
+}
+
 export interface QuestionResponse {
+  web_citations?: WebCitationOut[]
+  web_search_performed?: boolean
   answer: string
   citations: CitationOut[]
   insufficient_evidence: boolean
 }
 
 export interface QuestionRequest {
+  web_search?: boolean
   question: string
   document_ids?: string[] | null
 }

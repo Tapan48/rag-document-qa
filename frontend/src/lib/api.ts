@@ -102,6 +102,7 @@ export const api = {
 }
 
 export interface StreamCallbacks {
+  onStatus?: (phase: 'searching' | 'generating') => void
   onAnswerDelta: (delta: string) => void
   onCitations: (citations: CitationOut[]) => void
   onDone: (response: QuestionResponse) => void
@@ -152,7 +153,13 @@ export async function streamQuestion(
   let sawDone = false
   try {
     for await (const { event, data } of parseSseStream(response.body)) {
+      if (signal.aborted) return
       switch (event) {
+        case 'status': {
+          const parsed = JSON.parse(data) as { phase: 'searching' | 'generating' }
+          callbacks.onStatus?.(parsed.phase)
+          break
+        }
         case 'answer': {
           const parsed = JSON.parse(data) as { delta: string }
           callbacks.onAnswerDelta(parsed.delta)
@@ -166,7 +173,7 @@ export async function streamQuestion(
         case 'done': {
           sawDone = true
           callbacks.onDone(JSON.parse(data) as QuestionResponse)
-          break
+          return
         }
         case 'error': {
           const parsed = JSON.parse(data) as { code: string; message: string }
@@ -183,7 +190,7 @@ export async function streamQuestion(
     return
   }
 
-  if (!sawDone) {
+  if (!sawDone && !signal.aborted) {
     callbacks.onError('connection_lost', 'Connection closed before the answer finished')
   }
 }
