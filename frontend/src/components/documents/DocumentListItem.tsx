@@ -47,7 +47,7 @@ export function DocumentListItem({
   }
 
   return (
-    <li className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
+    <li className="flex w-full min-w-0 items-center gap-2 rounded-md border border-border px-3 py-2">
       {selectable && (
         <Checkbox
           id={checkboxId}
@@ -81,13 +81,13 @@ export function DocumentListItem({
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" size="icon" aria-label={`Delete ${document.filename}`}>
-            <Trash2 className="size-4" />
+            <Trash2 className="size-4 text-destructive" />
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete document</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="[overflow-wrap:anywhere]">
               This permanently deletes “{document.filename}” and everything extracted from it.
               This cannot be undone.
             </DialogDescription>

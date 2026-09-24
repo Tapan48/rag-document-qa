@@ -4,7 +4,6 @@ import { useRef, type ChangeEvent } from 'react'
 import { DocumentListItem } from '@/components/documents/DocumentListItem'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { UseDocumentsResult } from '@/hooks/useDocuments'
@@ -43,7 +42,7 @@ export function DocumentSidebar({
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-4">
       <div>
         <input
           ref={fileInputRef}
@@ -87,7 +86,7 @@ export function DocumentSidebar({
         </TabsList>
       </Tabs>
 
-      <ScrollArea className="flex-1">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
         {docs.isLoading && docs.documents.length === 0 ? (
           <div className="flex flex-col gap-2" aria-hidden="true">
             <Skeleton className="h-14 w-full" />
@@ -121,7 +120,7 @@ export function DocumentSidebar({
             Load more
           </Button>
         )}
-      </ScrollArea>
+      </div>
     </div>
   )
 }
