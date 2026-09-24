@@ -75,12 +75,12 @@ export function DocumentSidebar({
         )}
       </div>
 
-      <Tabs value={selectionMode} onValueChange={(v) => onSelectionModeChange(v as SelectionMode)}>
-        <TabsList className="w-full">
-          <TabsTrigger value="all" className="flex-1">
+      <Tabs className="min-w-0 shrink-0" value={selectionMode} onValueChange={(v) => onSelectionModeChange(v as SelectionMode)}>
+        <TabsList className="w-full group-data-horizontal/tabs:h-auto">
+          <TabsTrigger value="all" className="min-h-11 min-w-0 flex-1 whitespace-normal leading-snug">
             All ready documents
           </TabsTrigger>
-          <TabsTrigger value="selected" className="flex-1">
+          <TabsTrigger value="selected" className="min-h-11 min-w-0 flex-1 whitespace-normal leading-snug">
             Selected documents
           </TabsTrigger>
         </TabsList>
