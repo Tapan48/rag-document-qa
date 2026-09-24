@@ -105,6 +105,8 @@ Responses add `web_search_performed` and `web_citations` (empty when off). Docum
 
 Inline `[S2]` / `[W1]` markers resolve to real retrieved passages or provider URL annotations. Unknown or inconsistent source IDs fail validation. The research timestamp records when the search ran, not when a page was published. If a search returns no usable cited findings, the answer must acknowledge the missing evidence; search failures return an error instead of silently falling back.
 
+Grouped markers such as `[S2, W1]` are normalized to `[S2] [W1]` in the final answer before validation and display. This never adds or drops source IDs: unknown sources and disagreement with `cited_labels` still fail. Citation-validation failures use the message `Answer could not be verified against its sources. Please retry.` (HTTP 502, or SSE `generation_failed` with no `done` event). Server logs record an application-defined reason without document text, credentials, or model-provided labels. Streamed deltas remain provisional; only the final `done.answer` contains the authoritative normalized text.
+
 Defaults, configurable through environment variables:
 
 | Setting | Default |

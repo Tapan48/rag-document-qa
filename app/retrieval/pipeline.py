@@ -1,5 +1,6 @@
 import uuid
 import re
+import logging
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
@@ -9,13 +10,14 @@ from sqlalchemy import select
 from app.documents.queries import get_owned_document
 from app.ingestion.embeddings import EmbeddingError, EmbeddingTransientError, embed_texts
 from app.models.document import Document, DocumentStatus
-from app.retrieval.citations import resolve_citations
-from app.retrieval.generation import GeneratedAnswer, GenerationError
+from app.retrieval.citations import CitationValidationError, normalize_citation_markers, resolve_citations
+from app.retrieval.generation import GeneratedAnswer
 from app.retrieval.queries import RetrievedChunk, retrieve_chunks
 from app.retrieval.schemas import QuestionResponse
 from app.retrieval.research import ResearchResult
 
 FALLBACK_ANSWER = "No processed documents were found to answer this question."
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -69,6 +71,17 @@ def fallback_response() -> QuestionResponse:
 def finalize_answer(
     generated: GeneratedAnswer, retrieved: list[RetrievedChunk], research: ResearchResult | None = None
 ) -> QuestionResponse:
+    try:
+        return _finalize_answer(generated, retrieved, research)
+    except CitationValidationError as exc:
+        logger.warning("answer citation validation failed: reason=%s", exc.reason)
+        raise
+
+
+def _finalize_answer(
+    generated: GeneratedAnswer, retrieved: list[RetrievedChunk], research: ResearchResult | None
+) -> QuestionResponse:
+    answer = normalize_citation_markers(generated.answer)
     web_sources = {s.source_id: s for s in research.sources} if research is not None else {}
     document_labels = []
     web_citations = []
@@ -79,16 +92,16 @@ def finalize_answer(
             document_labels.append(label)  # resolve_citations rejects unknown S/W labels
     citations = resolve_citations(document_labels, retrieved)
     if research is not None:
-        inline = set(re.findall(r"\[([SW]\d+)\]", generated.answer))
+        inline = set(re.findall(r"\[([SW]\d+)\]", answer))
         if inline != set(generated.cited_labels):
-            raise GenerationError("Inline citations do not match cited sources")
+            raise CitationValidationError("inline_source_mismatch")
     if generated.insufficient_evidence:
         if citations or web_citations:
-            raise GenerationError("Insufficient-evidence answer must not include citations")
+            raise CitationValidationError("insufficient_evidence_with_citations")
     elif not citations and not web_citations:
-        raise GenerationError("Substantive answer must include at least one citation")
+        raise CitationValidationError("missing_citations")
     return QuestionResponse(
-        answer=generated.answer, citations=citations, web_citations=web_citations,
+        answer=answer, citations=citations, web_citations=web_citations,
         insufficient_evidence=generated.insufficient_evidence,
         web_search_performed=research is not None,
     )

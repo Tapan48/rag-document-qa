@@ -13,6 +13,7 @@ from app.retrieval.generation import (
 from app.retrieval.pipeline import PreparedQuestion, fallback_response, finalize_answer
 from app.retrieval.streaming import AnswerDelta, stream_answer
 from app.retrieval.schemas import QuestionResponse
+from app.retrieval.citations import CITATION_ERROR_MESSAGE, CitationValidationError
 from app.retrieval.research import research_web, ResearchError, ResearchTimeoutError, ResearchUnavailableError
 
 SSE_HEADERS = {
@@ -79,6 +80,11 @@ async def generate_question_stream_events(prepared: PreparedQuestion) -> AsyncIt
             elif isinstance(item, GeneratedAnswer):
                 try:
                     response = finalize_answer(item, prepared.retrieved, research)
+                except CitationValidationError:
+                    yield format_sse_event(
+                        "error", {"code": "generation_failed", "message": CITATION_ERROR_MESSAGE}
+                    )
+                    return
                 except GenerationError:
                     yield format_sse_event(
                         "error",

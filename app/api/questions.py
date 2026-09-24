@@ -17,6 +17,7 @@ from app.retrieval.generation import (
 )
 from app.retrieval.pipeline import fallback_response, finalize_answer, prepare_question
 from app.retrieval.schemas import QuestionRequest, QuestionResponse
+from app.retrieval.citations import CITATION_ERROR_MESSAGE, CitationValidationError
 from app.retrieval.sse import SSE_HEADERS, generate_question_stream_events, collect_web_answer
 
 router = APIRouter(prefix="/questions", tags=["questions"])
@@ -62,6 +63,8 @@ async def ask_question(
 
     try:
         return finalize_answer(generated, prepared.retrieved)
+    except CitationValidationError:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, CITATION_ERROR_MESSAGE)
     except GenerationError:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Answer generation failed")
 
