@@ -1,6 +1,6 @@
 # Evaluation
 
-15 questions run against the real, running app (`POST /questions`, real OpenAI calls — no mocking) using the fictional sample documents in [`samples/`](../samples/): `product_guide.pdf`, `support_policy.docx`, `troubleshooting_guide.txt` (a fictional "Solstice Home Hub" smart-home device).
+15 document-only questions (Web search off) run against the real, running app (`POST /questions`, real OpenAI calls — no mocking) using the fictional sample documents in [`samples/`](../samples/): `product_guide.pdf`, `support_policy.docx`, `troubleshooting_guide.txt` (a fictional "Solstice Home Hub" smart-home device).
 
 **Run date:** 2026-09-22
 **Model settings:** `EMBEDDING_MODEL=text-embedding-3-small` (1536 dims), `CHAT_MODEL=gpt-5.6-luna`, `REASONING_EFFORT=none`, `RETRIEVAL_TOP_K=5`, `CHUNK_SIZE_TOKENS=500` / `CHUNK_OVERLAP_TOKENS=100` (all defaults from `app/config.py`)
@@ -48,6 +48,44 @@ Two other genuinely-tried "unsupported" candidates were dropped from this set af
 ## Summary
 
 **15/15 correct** (10 supported, 3 correctly flagged insufficient-evidence, 2 correctly multi-document). Cross-user isolation was also verified live: a second account asking about the hub with no documents uploaded got `insufficient_evidence: true` and an empty document list (see [DEMO.md](DEMO.md#6-verify-isolation-using-a-second-user)).
+
+## Web-search verification (2026-09-24)
+
+This is a separate live comparison, **not an expansion of the 15-question document-only benchmark**. It ran against the current local Docker app with real OpenAI embeddings, web research, and streamed generation. A disposable non-admin account uploaded `public-board-specs.txt` and waited for `ready` before submitting the question in the browser with **Web search on** and **All ready documents** selected.
+
+**Public sample:**
+
+> Arduino Nano (classic) uses ATmega328P, operates at 5V, and has 2KB SRAM. No prices or stock availability are listed.
+
+**Submitted question:**
+
+> Compare this classic Arduino Nano with Nano Every: processor, voltage and SRAM. Use official sources, cite both source types, and flag unknown prices or availability.
+
+### Observed live results
+
+| Check | Observed result |
+| --- | --- |
+| Combined answer | A table reported ATmega328P / ATmega4809, 5 V / 5 V, and 2 KB / 6 KB SRAM for classic Nano / Nano Every, respectively. |
+| Document evidence | S1 resolved to `public-board-specs.txt`; its cited classic-Nano specifications matched the uploaded passage. |
+| Web evidence | The answer included W1–W3 inline links and three separate Arduino web-source entries with research timestamps. |
+| Missing information | The answer explicitly said that prices and availability were unknown from the supplied evidence; it did not invent either. |
+| Desktop | At 1440 × 1000, the completed answer displayed a comparison table and both citation types. |
+| Mobile | At 430 × 1000, the page stayed within the viewport and the table scrolled horizontally within the answer panel. |
+| Source display | Document and web sources appeared in separate lists; web entries included clickable URLs and research timestamps. |
+
+Web sources returned in this run:
+
+- **W1:** [Arduino Nano — Arduino Official Store](https://store.arduino.cc/arduino-nano?utm_source=openai).
+- **W2:** [Nano Every hardware documentation — Arduino](https://docs.arduino.cc/hardware/nano-every?utm_source=openai).
+- **W3:** [Arduino Nano Every with Headers — Arduino Official Store](https://store.arduino.cc/collections/most-popular/products/nano-every-with-headers?_fid=8d7dce536&_pos=8&_ss=c&utm_source=openai).
+
+Evidence: [desktop comparison](screenshots/web-search-desktop.png), [mobile comparison](screenshots/web-search-mobile.png), and [source lists](screenshots/web-search-sources.png). The [walkthrough](DEMO.md#web-comparison-demonstration) embeds all three captures. The disposable account, uploaded file, document, and chunks were removed afterward.
+
+### Separate automated coverage
+
+Provider-mocked tests in [`tests/test_web_research.py`](../tests/test_web_research.py) cover required search calls, toggle-off behavior, no-document searches, ownership/readiness checks, citation validation, missing evidence, failures, deadlines, and cancellation. Frontend tests in [`WebSearch.test.tsx`](../frontend/src/pages/WebSearch.test.tsx) cover the toggle, retry-mode preservation, Stop, selection requirements, and safe Markdown/link rendering. These tests passed during feature verification; the screenshots are evidence of the live comparison and layout, not proof that every failure path was exercised live in this run.
+
+One successful comparison is a smoke test, not a web-research accuracy benchmark. Source-ID validation checks provenance and consistency; it does not establish that every generated claim is correct. Prices and search results can change, listed prices do not guarantee stock, and these board specifications alone do not establish compatibility.
 
 ## Limitations
 

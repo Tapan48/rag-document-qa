@@ -14,6 +14,10 @@ The Web search toggle starts off. When enabled, the app performs a real, bounded
 
 Web research adds API charges. Defaults: `WEB_SEARCH_MODEL=gpt-5.6-luna`, up to three web-tool calls, 90 seconds for research, and 60 seconds for answer generation. No database migration or background research worker is needed. See [API details and limits](docs/API_REFERENCE.md#optional-web-research).
 
+[![Desktop web-search comparison of Arduino Nano boards with inline document and web citations](docs/screenshots/web-search-desktop.png)](docs/DEMO.md#web-comparison-demonstration)
+
+*Real comparison using a disposable public sample. See the [web-search walkthrough](docs/DEMO.md#web-comparison-demonstration) for mobile and source-list screenshots.*
+
 ## Prerequisites
 
 - Docker and Docker Compose

@@ -1,8 +1,8 @@
 # Demo Walkthrough
 
-This walkthrough uses the fictional sample documents in [`samples/`](../samples/) — a fake smart-home hub's product guide, support policy, and troubleshooting guide (see `samples/generate_samples.py` for the source content). No personal or real-world data is used anywhere in this walkthrough or its screenshots.
+The original document-only walkthrough uses the fictional sample documents in [`samples/`](../samples/) — a fake smart-home hub's product guide, support policy, and troubleshooting guide. The web-search walkthrough below uses public Arduino specifications and a disposable demo account. No private documents or credentials appear in the screenshots.
 
-**Status: verified.** Every step below was run against the real, running Docker stack — real registration, real uploads, real OpenAI calls, real streaming — using an automated browser (Playwright) driving the actual app at `http://localhost:5173`, on 2026-09-22. Screenshots are real captures from that run, not mockups.
+**Original walkthrough verified (Web search off).** Steps 1–7 below were run against the real, running Docker stack — real registration, real uploads, real OpenAI calls, real streaming — using an automated browser (Playwright) driving the actual app at `http://localhost:5173`, on 2026-09-22. The original screenshots are real captures from that run. The web-search screenshots were captured separately on 2026-09-24.
 
 ## Prerequisites
 
@@ -93,9 +93,29 @@ Verified with an automated keyboard-only pass (no mouse), confirming every item 
 ## Web comparison demonstration
 
 1. Upload a disposable TXT containing: “Arduino Nano (classic) uses ATmega328P, operates at 5V, and has 2KB SRAM. No prices or stock availability are listed.” Wait for Ready.
-2. Enable **Web search** and ask: “Compare this classic Arduino Nano with Arduino Nano Every using official manufacturer sources. Make a table for processor, operating voltage, and SRAM. State unknown prices or availability. Cite document and web sources.”
+2. Enable **Web search** and ask: “Compare this classic Arduino Nano with Nano Every: processor, voltage and SRAM. Use official sources, cite both source types, and flag unknown prices or availability.”
 3. Observe **Searching the web…**, then **Generating answer…**. Confirm the table, inline document/web markers, document passage panel, and separately linked web sources with research timestamps.
 4. On a phone, scroll the table horizontally within the answer panel. Use Stop during another request; Retry after a failure retains that request's original mode.
 5. Delete the disposable document. With all-ready mode selected, web research also works with no documents. Turning Web search off returns to document-only answers.
 
-A real local comparison was verified on 2026-09-24 using only this public sample: it returned an S1 document citation and two official Arduino web sources, with readable desktop/mobile results. Prices and source ordering are not stable test expectations.
+**Screenshot run: 2026-09-24.** A disposable local account uploaded `public-board-specs.txt` through the API and waited for real ingestion to complete. The current browser interface then made a real streamed web-search request. The answer contained an S1 document citation and three Arduino web sources. All three images below show that same completed answer; no response content was mocked or edited. The account and document were removed after capture.
+
+### Desktop comparison
+
+![Desktop workspace with Web search enabled, the Arduino Nano comparison table, inline S1 and W1–W3 citations, and source lists](screenshots/web-search-desktop.png)
+
+*Desktop at 1440 × 1000: document and web evidence appear together in a comparison table. Missing price and availability information is stated explicitly.*
+
+### Mobile comparison
+
+![Phone-sized workspace showing the enabled Web search toggle and the cited Arduino Nano comparison in a horizontally scrollable table](screenshots/web-search-mobile.png)
+
+*Mobile at 430 × 1000: the table scrolls horizontally inside the answer panel to reveal the remaining columns; the page itself does not overflow.*
+
+### Document and web sources
+
+![Answer panel scrolled to separate Document sources and Web sources lists, including the sample document, three linked Arduino sources, and research timestamps](screenshots/web-search-sources.png)
+
+*Source-list view at 1100 × 760: S1 opens the supporting document passage; W1–W3 link to the web evidence. Timestamps identify when research ran.*
+
+See [web-search verification results](EVALUATION.md#web-search-verification-2026-09-24) for observed results and the separate mocked-test coverage. Prices, wording, source ordering, and search results can change across runs.
