@@ -1,5 +1,14 @@
 # Public HTTPS and approved registration
 
+> Shared ingress (2026-10-08): the public frontend also routes the ticket-booking
+> domain. Before starting the public stack, run
+> `docker network create --driver bridge --internal ticket-edge` once (skip creation
+> if it already exists; verify `docker network inspect ticket-edge --format
+> '{{.Driver}} {{.Internal}}'` prints `bridge true`). Deploy the tracked
+> `frontend/Caddyfile.public`, now bind-mounted read-only. See the
+> [shared ingress deployment and rollback notes](../plan/deployment.md#shared-caddy-entry-point-for-ticket-booking-2026-10-08).
+
+
 This extends [the private production stack](DEPLOYMENT.md) on the same server.
 Use Docker Compose 2.24.4 or newer (`!override` support). The approval feature adds an administrator flag, access requests, and email
 delivery tables through Alembic. Existing accounts, documents, and vectors

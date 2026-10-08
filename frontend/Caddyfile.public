@@ -36,3 +36,13 @@ http://:8081 {
 		file_server
 	}
 }
+
+# Both domains share public 443. Verify TLS to the isolated ticket proxy too.
+event-ticket-booking.duckdns.org {
+	reverse_proxy https://ticket-origin:8443 {
+		header_up Host {host}
+		transport http {
+			tls_server_name event-ticket-booking.duckdns.org
+		}
+	}
+}
